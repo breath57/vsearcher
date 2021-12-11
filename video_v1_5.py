@@ -18,7 +18,8 @@ PaddleFrame遍历完后, 自动去除cap对象,
 args.speed_x
 del self.cap self.result 将 paddleOCR置出 节约持久化
 """
-paddle.device.set_device('gpu:0')
+# @risk 环境迁移之后没有cuda可能会报错
+# paddle.device.set_device('gpu:0')
 # class Frame():
 #     """
 #      如果业务复杂, 需要考虑多种OCR识别库, 由于返回的格式不一样, 再抽象出该类
@@ -184,7 +185,9 @@ class PaddleFrame():
                 boxes.append(self.boxes[i])
                 txts.append(self.txts[i])
         # @wait 还可以有 keyword, 也就是每页中 又大又长的框框
-        return vo.Frame( self.id, self.img, boxes, self.name, txts, title=self.getTitles(3) )
+
+        result = vo.Frame( self.id, self.img, boxes, self.name, txts, title=self.getTitles(args.title_num) )
+        return result.__dict__ if args.search_result_dict_mode else result
 
     # def setOutPath(self, out_path):
     #     self.out_path = out_path
@@ -425,10 +428,15 @@ class Video:
         kfs = []
         for pf in self.kfs:
             pfvo = pf.searchByKey( key )
-            if not pfvo.isEmpty():
-                kfs.append( pfvo )
+            if args.search_result_dict_mode:
+                if pfvo['boxes']:
+                    kfs.append( pfvo )
+            else:
+                if not pfvo.isEmpty():
+                    kfs.append(pfvo)
 
-        return vo.Video( self.id, kfs, self.name, self.chapter_id )
+        result =  vo.Video( self.id, kfs, self.name, self.chapter_id )
+        return result.__dict__ if args.search_result_dict_mode else result
 
     def getTimeMsByFrameID(self, frame_id):
         """
@@ -579,12 +587,17 @@ class Chapter():
         ]
         需求:　需要有序的排序
         """
-        vs = []
+        videos = []
         for v in self.videos:
             video_vo = v.searchByKey(key)
-            if not video_vo.isEmpty():
-                vs.append(video_vo)
-        return vo.Chapter(self.id, vs, self.name, self.course_id)
+            if args.search_result_dict_mode:
+                if video_vo['kfs']:
+                    videos.append( video_vo )
+            else:
+                if not video_vo.isEmpty():
+                    videos.append(video_vo)
+        result =  vo.Chapter(self.id, videos, self.name, self.course_id)
+        return result.__dict__ if args.search_result_dict_mode else result
 
 class Course():
     """"
@@ -609,9 +622,14 @@ class Course():
         chapters = []
         for c in self.chapters:
             chapter_vo = c.searchByKey(key)
-            if not chapter_vo.isEmpty():
-                chapters.append(chapter_vo)
-        return vo.Course(self.id, chapters, self.name)
+            if args.search_result_dict_mode:
+                if chapter_vo['videos']:
+                    chapters.append( chapter_vo )
+            else:
+                if not chapter_vo.isEmpty():
+                    chapters.append(chapter_vo)
+        result =  vo.Course(self.id, chapters, self.name)
+        return result.__dict__ if args.search_result_dict_mode else result
 
 
 
