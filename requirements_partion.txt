@@ -1,0 +1,5 @@
+filetype==1.0.8
+jieba==0.42.1
+numpy==1.19.5
+opencv_python==4.2.0.32
+paddleocr==2.3.0.2
