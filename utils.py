@@ -7,7 +7,7 @@ from vsearch.config import args
 import os
 def saveObject(out_path, name, o):
     if not os.path.exists(out_path):
-        os.mkdir(out_path)
+        os.makedirs(out_path, mode=0o777, exist_ok=True)
     output_hal = open(f'{out_path}\\{name}.pkl', 'wb')
     _str = pickle.dumps(o)
     output_hal.write(_str)
