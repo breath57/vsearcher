@@ -5,16 +5,16 @@ import os
 import cv2 as cv
 import numpy as np
 from paddleocr import PaddleOCR
-import paddle
+# import paddle
 
-from vsearch import utils
-from vsearch.config import args
-from vsearch.sim_v1 import TextSimilarity
-from vsearch.config.path import RootPath
+from . import utils
+from .config import args
+from .sim_v1 import TextSimilarity
+from .config.path import RootPath
 
-from vsearch.vo import vo
+from .vo import vo
 
-paddle.set_device('gpu:0')
+# paddle.set_device('gpu:0')
 
 """
 PaddleFrame遍历完后, 自动去除cap对象,
@@ -644,7 +644,7 @@ class Assember():
     负责将用户指定的路径（课程，章节， 小节）： 装配出不同的对象（Course， Chapter， Video）
     """
     @staticmethod
-    def executeCourse(course_root_path, output_dir, course_id, name="") -> Course:
+    def executeCourse(course_root_path, course_id, output_dir=RootPath.output_courses_dir , name="") -> Course:
         chapter_dirs = glob.glob(f'{course_root_path}\\*')
         #过滤非目录文件
         chapter_dirs = Assember.__filter_no_dir(chapter_dirs)
@@ -660,7 +660,7 @@ class Assember():
         return Course(id = course_id, name=name, chapters=chapters)
 
     @staticmethod
-    def executeChapter(chapter_path, output_dir, chapter_id="", chapter_name="", course_id="") -> Chapter:
+    def executeChapter(chapter_path, output_dir=RootPath.output_chapters_dir, chapter_id="", chapter_name="", course_id="") -> Chapter:
         # 获取章节目录下的所有视频的路径
         # @risk 视频类型的过滤器可能有隐藏的bug
         video_paths = glob.glob(f'{chapter_path}\\*')
@@ -675,7 +675,7 @@ class Assember():
 
 
     @staticmethod
-    def executeVideo(video_path, output_dir, video_id="", chapter_id="", name="") -> Video:
+    def executeVideo(video_path, output_dir=RootPath.output_videos_dir, video_id="", chapter_id="", name="") -> Video:
         print(f'output_dir: {output_dir}')
         output_dir = output_dir + (name or ("\\" + video_path.split('\\')[-1].split('.')[0]))
         Assember._setDir( output_dir )

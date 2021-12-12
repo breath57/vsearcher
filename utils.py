@@ -3,7 +3,7 @@ import pickle
 import cv2 as cv
 import numpy as np
 
-from vsearch.config import args
+from .config import args
 import os
 def saveObject(out_path, name, o):
     if not os.path.exists(out_path):
