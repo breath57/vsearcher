@@ -1,3 +1,4 @@
+import json
 import pickle
 import cv2 as cv
 import numpy as np
@@ -18,16 +19,6 @@ def readObject(input_path):
         return pickle.loads(file.read())
 
 
-# def saveVideoObject(out_path, name, o):
-#     o.cap = None
-#     saveObject(out_path, name, o)
-#
-#
-# def readVideoObject(input_path):
-#     v = readObject(input_path)
-#     v.cap = cv.VideoCapture(v.path)
-#     return v
-
 def cvimread(path):
     """
     读取路径包含中文的图片
@@ -41,6 +32,27 @@ def cvimwrite(path, img):
     # cv2.imencode(保存格式, 保存图片)[1].tofile(保存路径)
     cv.imencode( f'.{args.img_format}', img )[1].tofile( path )
 
+
+
+def __json_dumps_default_func(o):
+    tp = str(type(o))
+    # print(f'current type: {tp}  type: {type(o)}   value: {o}  ')
+    if tp.find('float') != -1:
+        o = float(o)
+    elif tp.find('array') != -1:
+        o = o.tolist()
+    else:
+        o = o.__dict__
+    return o
+
+def json_dumps(o) -> str:
+    """
+    可以兼容: 含有numpy 还有 该项目中对象的 json序列化
+    """
+    return json.dumps(o, default=__json_dumps_default_func)
+
+def json_loads(json_str):
+    return json.loads(json_str)
 
 # def saveChapterObject(input, )
 

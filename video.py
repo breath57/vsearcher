@@ -6,11 +6,15 @@ import cv2 as cv
 import numpy as np
 from paddleocr import PaddleOCR
 import paddle
+
+from vsearch import utils
 from vsearch.config import args
 from vsearch.sim_v1 import TextSimilarity
 from vsearch.config.path import RootPath
 
 from vsearch.vo import vo
+
+paddle.set_device('gpu:0')
 
 """
 PaddleFrame遍历完后, 自动去除cap对象,
@@ -159,7 +163,7 @@ class PaddleFrame():
 
 
     # @wait 将搜索的方法外置
-    def searchByKey(self, key):
+    def searchByKey(self, key, json_dumps=False):
         """
         :return [{box1相关信息}, {}, {}  ]= 关键帧的box位置的相关信息
             @wait返回True 还是, 返回在具体某个boxes的坐标, 有利于框出来
@@ -187,7 +191,7 @@ class PaddleFrame():
         # @wait 还可以有 keyword, 也就是每页中 又大又长的框框
 
         result = vo.Frame( self.id, self.img, boxes, self.name, txts, title=self.getTitles(args.title_num) )
-        return result.__dict__ if args.search_result_dict_mode else result
+        return utils.json_dumps(result) if json_dumps else result
 
     # def setOutPath(self, out_path):
     #     self.out_path = out_path
@@ -424,19 +428,19 @@ class Video:
         # if run:
         #     self._run()
 
-    def searchByKey(self, key):
+    def searchByKey(self, key, json_dumps=False):
         kfs = []
         for pf in self.kfs:
             pfvo = pf.searchByKey( key )
-            if args.search_result_dict_mode:
-                if pfvo['boxes']:
-                    kfs.append( pfvo )
-            else:
-                if not pfvo.isEmpty():
-                    kfs.append(pfvo)
+            # if args.search_result_dict_mode:
+            #     if pfvo['boxes']:
+            #         kfs.append( pfvo )
+            # else:
+            if not pfvo.isEmpty():
+                kfs.append(pfvo)
 
         result =  vo.Video( self.id, kfs, self.name, self.chapter_id )
-        return result.__dict__ if args.search_result_dict_mode else result
+        return utils.json_dumps(result) if json_dumps else result
 
     def getTimeMsByFrameID(self, frame_id):
         """
@@ -566,7 +570,7 @@ class Chapter():
         return self.videos[index]
 
 
-    def searchByKey(self, key):
+    def searchByKey(self, key, json_dumps = False):
         """
         :param key:
         :return: r[小节号][帧]
@@ -590,14 +594,14 @@ class Chapter():
         videos = []
         for v in self.videos:
             video_vo = v.searchByKey(key)
-            if args.search_result_dict_mode:
-                if video_vo['kfs']:
-                    videos.append( video_vo )
-            else:
-                if not video_vo.isEmpty():
-                    videos.append(video_vo)
+            # if args.search_result_dict_mode:
+            #     if video_vo['kfs']:
+            #         videos.append( video_vo )
+            # else:
+            if not video_vo.isEmpty():
+                videos.append(video_vo)
         result =  vo.Chapter(self.id, videos, self.name, self.course_id)
-        return result.__dict__ if args.search_result_dict_mode else result
+        return utils.json_dumps(result) if json_dumps else result
 
 class Course():
     """"
@@ -618,18 +622,18 @@ class Course():
     def __getitem__(self, index):
         return self.chapters[index]
 
-    def searchByKey(self, key):
+    def searchByKey(self, key, json_dumps=False):
         chapters = []
         for c in self.chapters:
             chapter_vo = c.searchByKey(key)
-            if args.search_result_dict_mode:
-                if chapter_vo['videos']:
-                    chapters.append( chapter_vo )
-            else:
-                if not chapter_vo.isEmpty():
-                    chapters.append(chapter_vo)
+            # if args.search_result_dict_mode:
+            #     if chapter_vo['videos']:
+            #         chapters.append( chapter_vo )
+            # else:
+            if not chapter_vo.isEmpty():
+                chapters.append(chapter_vo)
         result =  vo.Course(self.id, chapters, self.name)
-        return result.__dict__ if args.search_result_dict_mode else result
+        return utils.json_dumps(result) if json_dumps else result
 
 
 
@@ -641,13 +645,14 @@ class Assember():
     """
     @staticmethod
     def executeCourse(course_root_path, output_dir, course_id, name="") -> Course:
-        # @risk 没有过滤掉非目录的文件, 存在会引起报错
         chapter_dirs = glob.glob(f'{course_root_path}\\*')
         #过滤非目录文件
         chapter_dirs = Assember.__filter_no_dir(chapter_dirs)
         name = name or course_root_path.split('\\')[-1]
+        # 初始化 输出目录
         output_dir = output_dir + "\\" + name
         Assember._setDir( output_dir )
+
         chapters = [Assember.executeChapter(
             chapter_path=dir_path, output_dir=output_dir, chapter_id=i + 1,
             chapter_name=dir_path.split('\\')[-1] , course_id=course_id )
@@ -693,7 +698,8 @@ class Assember():
         :return:
         """
         if not os.path.exists( dir_path ):
-            os.mkdir( dir_path )
+            os.makedirs(dir_path, mode=0o777, exist_ok=True)
+            # os.mkdir( dir_path )
         else:
             shutil.rmtree(dir_path)
             os.mkdir( dir_path )

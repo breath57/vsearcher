@@ -17,14 +17,21 @@ class RootPath:
     video_dir = f'{project_dir}\\video'
 
     # 输出目录的路径
-    output_dir = f'{project_dir}\\output'
+    output_dir = f'{project_dir}\\vsearch-output'
 
-    output_video_object_dir = f'{output_dir}\\video_object'
-    # fm 代表需要进行format才能使用
-    output_frame_dir_fm = output_dir + "\\keyframe\\v{}"
+    # 处理视频后产生的对象保存的路径
+    output_video_object_dir = f'{output_dir}\\objects\\videos'
+    output_chapter_object_dir = f'{output_dir}\\objects\\chapters'
+    output_course_object_dir = f'{output_dir}\\objects\\courses'
 
+    # 处理视频后产生的关键图片保存的路径
+    output_courses_dir = output_dir + "\\course"
+    output_chapters_dir = output_dir + "\\chapters"
+    output_videos_dir = output_dir + "\\videos"
+
+    # 导入训练好的机器学习模型路径
     _model_dir = f'{project_dir}\\vsearch\\model'
 
+    # paddleocr 文字检测 和 文字分类模型
     det_model_dir = f'{_model_dir}\\ocr\\paddle\\ch_ppocr_mobile_v2.0_det_infer'
-
     rec_model_dir = f'{_model_dir}\\ocr\\paddle\\ch_ppocr_mobile_v2.0_rec_infer'

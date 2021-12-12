@@ -10,14 +10,8 @@ th_sim_score = 0.82  # 前后两帧相似度
 th_blur_score = 60  # 可以依靠统计 均值来定 | 根据视频的分别率来定
 
 title_num = 3 # 帧获取的标题数量
-#
-# SEARCH_RESULT_DICT= 'dict' # 取得实例对象的dict的值作为返回结果, 有利于json序列化
-# SEARCH_RESULT_OBJECT = 'object'  # object: 就是实例对象
-#
-# search_result_type = SEARCH_RESULT_DICT
-search_result_dict_mode = True # 取得实例对象的dict的值作为返回结果, 有利于json序列化
 
-img_format = 'png'
+img_format = 'png' # 图片保存的格式
 
 # video_format= ['mp4', 'flv', 'avi', 'wmv', 'mpg', 'mpeg'] # 其他格式还未测试
 
