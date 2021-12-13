@@ -23,7 +23,7 @@ class RootPath:
     video_dir = f'{project_root_dir}\\video'
 
     # 输出目录的路径
-    output_dir = f'{project_root_dir}\\vsearch-output'
+    output_dir = f'{project_root_dir}\\static\\vsearch-output'
 
     # 处理视频后产生的对象保存的路径
     output_video_object_dir = f'{output_dir}\\objects\\videos'

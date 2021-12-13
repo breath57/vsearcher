@@ -1,4 +1,5 @@
-from  dataclasses import dataclass
+from dataclasses import dataclass
+from paddleocr import draw_ocr
 
 
 @dataclass
@@ -8,45 +9,52 @@ class Base:
     update_time: str
 
 
-
 @dataclass
-class Frame():
+class Frame:
     id: int
-    img: str
-    boxes: list
     name: str
-    txts: list
     title: list
+    img: str
+    ms: int
+    time: str
+    txts: list
+    boxes: list
+
+    def draw_boxes(self):
+        # draw_ocr()
+        # 读取图片 -> 画圈保存-> 临时保存? -> 还是给前端自己画
 
     def isEmpty(self):
         return len(self.boxes) == 0
 
+
 @dataclass
-class Video():
+class Video:
     id: int
-    kfs: list
     name: str
     chapter_id: int
+    kfs: list
 
     def isEmpty(self):
         return len(self.kfs) == 0
 
 
 @dataclass
-class Chapter():
+class Chapter:
     id: int
-    videos: list
     name: str
     course_id: int
+    videos: list
 
     def isEmpty(self):
-        return len( self.videos ) == 0
+        return len(self.videos) == 0
+
 
 @dataclass
-class Course():
+class Course:
     id: int
-    chapters: list
     name: str
+    chapters: list
 
     def isEmpty(self):
         return len(self.chapters) == 0
