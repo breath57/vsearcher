@@ -38,7 +38,7 @@ class RootPath:
     # 导入训练好的机器学习模型路径
     _model_dir = f'{vsearch_root_dir}\\model'
 
-    # paddleocr 文字检测 和 文字分类模型 | 最新版可以自行去git的paddleocr项目下载
+    # paddleocr 文字检测 和 文字分类模型 | 最新版可以自行去git的paddleocr查看, 将此处的路径末尾改名字即可自动下载
     det_model_dir = f'{_model_dir}\\ocr\\paddle\\ch_ppocr_mobile_v2.0_det_infer'
     rec_model_dir = f'{_model_dir}\\ocr\\paddle\\ch_ppocr_mobile_v2.0_rec_infer'
 

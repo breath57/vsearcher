@@ -5,7 +5,8 @@ import numpy as np
 
 from .config import args
 import os
-def saveObject(out_path, name, o):
+def saveObject(out_path, o, name=''):
+    name  = name or o.name
     if not os.path.exists(out_path):
         os.makedirs(out_path, mode=0o777, exist_ok=True)
     output_hal = open(f'{out_path}\\{name}.pkl', 'wb')

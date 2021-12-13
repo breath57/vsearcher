@@ -73,7 +73,7 @@ class PaddleFrame():
         self.outpath = img_outpath
         self.video_id = video_id
         self.ms = ms
-        self.name = f'{video_id}#{self.id}'
+        self.name = f'{video_id}{args.img_name_gap}{self.id}'
         self.frame = frame
         self.blur_score = cv.Laplacian(frame, cv.CV_32F).var()
         """
@@ -204,7 +204,10 @@ class PaddleFrame():
         cv.imencode( f'.{args.img_format}', self.frame)[1].tofile( img_path )
         # @risk 图片的读取 : 这里指定的类型为 uint8 为0-255, BRG模式, 如果有其他色域的图片, 将不适用
         # cv.imdecode( np.fromfile(img_path, dtype=np.uint8 ), -1 )
-        self.img = img_path
+        # 获取 root: vsearch-output  real: C/vsearch-output/
+        img_url = img_path.replace(RootPath.project_root_dir, args.img_url_prefix)
+        print(f'img_url: {img_url}')
+        self.img = img_url
 
         # @risk 删除属性, 节约持久化需要的内存
         del self.frame

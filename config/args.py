@@ -12,7 +12,8 @@ th_blur_score = 60  # 可以依靠统计 均值来定 | 根据视频的分别率
 title_num = 3 # 帧获取的标题数量
 
 img_format = 'png' # 图片保存的格式
-
+img_name_gap = '-'
+img_url_prefix = 'http://127.0.0.1:8000'
 # video_format= ['mp4', 'flv', 'avi', 'wmv', 'mpg', 'mpeg'] # 其他格式还未测试
 
 def set_step(step_='fps', speed_x_=1):
