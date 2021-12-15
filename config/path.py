@@ -6,11 +6,13 @@ def getProjectRootPath():
     i = __file__.index(r)
     return __file__[: i-1]
 
+
 def getThisPackageRootPath():
     r = __name__.replace('.', '\\')
     # @risk 不能随意切换到其他目录, 修复方案: zai, __init__文件中获取相应的项目路径
     i = r.index('config')
     return getProjectRootPath() + "\\" + r[:i-1]
+
 
 class RootPath:
     # 当前项目的根路径
@@ -24,6 +26,9 @@ class RootPath:
 
     # 输出目录的路径
     output_dir = f'{project_root_dir}\\static\\vsearch-output'
+
+    # 搜索结果输出目录
+    output_search_result_dir = f'{output_dir}\\search-result'
 
     # 处理视频后产生的对象保存的路径
     output_video_object_dir = f'{output_dir}\\objects\\videos'
@@ -41,4 +46,3 @@ class RootPath:
     # paddleocr 文字检测 和 文字分类模型 | 最新版可以自行去git的paddleocr查看, 将此处的路径末尾改名字即可自动下载
     det_model_dir = f'{_model_dir}\\ocr\\paddle\\ch_ppocr_mobile_v2.0_det_infer'
     rec_model_dir = f'{_model_dir}\\ocr\\paddle\\ch_ppocr_mobile_v2.0_rec_infer'
-

@@ -20,9 +20,9 @@ class Frame:
     txts: list
     boxes: list
 
-    def draw_boxes(self):
-        # draw_ocr()
-        # 读取图片 -> 画圈保存-> 临时保存? -> 还是给前端自己画
+    # def draw_boxes(self):
+    # draw_ocr()
+    # 读取图片 -> 画圈保存-> 临时保存? -> 还是给前端自己画
 
     def isEmpty(self):
         return len(self.boxes) == 0
@@ -32,6 +32,7 @@ class Frame:
 class Video:
     id: int
     name: str
+    local_path: str
     chapter_id: int
     kfs: list
 

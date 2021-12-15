@@ -1,7 +1,11 @@
 import json
 import pickle
+import shutil
 import cv2 as cv
 import numpy as np
+from vsearch import video
+
+from vsearch.config import path
 
 from .config import args
 import os
@@ -81,6 +85,35 @@ def msToH_M_S_str(ms):
     time = f'{h}:{mm}:{ss}'
     print(f'time: {time}')
     return time
+
+
+def local2url(local_path):
+    url = local_path.replace(
+        path.RootPath.project_root_dir, args.img_url_prefix)
+    return url.replace('\\', '/')
+
+
+def url2local(url):
+    # @wait 是否有必要兼容win 还是全局 统一/
+    local_path = url.replace(
+        args.img_url_prefix, path.RootPath.project_root_dir)
+    return local_path.replace('/', '\\')
+
+
+# @wait
+def copy_video_by_img_url(local_path, img_url, file_name='v'):
+    """
+    将视频在电脑的位置，拷贝到img_url对应在本地的文件夹中的位置，
+    然后生成视频支持的http访问的url 
+    """
+    video_format = local_path.split('.')[-1]
+    local_img_path = url2local(img_url)
+    dest = local_img_path.replace(
+        local_img_path.split('\\')[-1], f'{file_name}.{video_format}')
+    if not os.path.exists(dest):
+        shutil.copy(local_path, dest)
+    video_url = local2url(dest)
+    return video_url
 
 
 class time:

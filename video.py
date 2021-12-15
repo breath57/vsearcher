@@ -1,9 +1,13 @@
+import time
+from paddle.fluid.layers.nn import pad
+from paddleocr import draw_ocr
 import filetype
 import shutil
 import copy as cp
 import glob
 import os
 import cv2 as cv
+from filetype.types import VIDEO
 import numpy as np
 from paddleocr import PaddleOCR
 
@@ -15,13 +19,17 @@ from .sim_v1 import TextSimilarity
 from .config.path import RootPath
 
 from .vo import vo
+from vsearch.config import path
 
 if args.use_gpu:
     import os
     import paddle
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-    print(f'use gpu device: {args.gpu_name}')
-    paddle.set_device(args.gpu_name)
+
+    # @risk 判断设备是否存在 再设置
+    if paddle.get_device() != 'cpu':
+        paddle.set_device(args.gpu_name)
+    print(f'current use device: {args.gpu_name}')
 # paddle.set_device('gpu:0')
 
 """
@@ -43,6 +51,80 @@ del self.cap self.result 将 paddleOCR置出 节约持久化
 #     @abstractmethod
 #     def searchByKey(self, key):
 #         pass
+
+from PIL import Image
+# @wait 设计的不合理
+
+
+class Searcher:
+    """
+        读取结果
+        另存为有标记的图片
+        设置线程监视1分钟删除
+        生成图片目录  temp -> 随机名称 
+    """
+
+    search_timestamp = ''
+
+    @classmethod
+    def processPfVo(cls, pf: vo.Frame, unique_file_name=""):
+        # @wait 文件名包含 key, 可以避免重复请求 处理返回
+        # @performance wait 算法流程优化
+        # @wait 程名 + 章节名 + 视频名称 + key
+        print('需要读取的图片路径')
+        # http://127.0.0.1:5000/static/vsearch-output/videos/pattern_pure_ppt/-0.png'
+        file_path = utils.url2local(pf.img)
+        frame = utils.cvimread(file_path)
+
+        im_show = draw_ocr(frame, pf.boxes)
+        im_show = Image.fromarray(im_show)
+        # im_show shape h,w,c
+        # 图片的输出目录 定义
+        output_dir = path.RootPath.output_search_result_dir
+        output_dir = f'{output_dir}\\{cls.search_timestamp}'
+        output_dir = Searcher.__setDir(output_dir)
+        file_path = f'{output_dir}\\_{int(time.time_ns())%100000000}_.{args.img_format}'
+        print(f"处理过的图片保存路径: {file_path}")
+        im_show.save(file_path)  # 结果图片保存在代码同级文件夹中。
+        img_url = utils.local2url(file_path)
+        pf.img = img_url
+        print(f"图片url: {img_url}")
+        return pf
+        # 图片保存
+
+    @staticmethod
+    def __setDir(dir_path):
+        """
+        如果目录不存在, 就创建目录; 存在不处理
+        :param dir_path:
+        :return:
+        """
+        # @modify 为了可以找到图片的路径
+        dir_path = dir_path.replace(" ", "%").replace("\t", "%")
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path, mode=0o777, exist_ok=True)
+            # os.mkdir( dir_path )
+        return dir_path
+
+    @classmethod
+    def __reset_time_stamp(cls):
+        cls.search_timestamp = str(int(time.time()))
+
+    @classmethod
+    def search(cls, _type, name, key, json_dumps=False):
+        # 重置搜索时间
+        cls.__reset_time_stamp()
+        o = None
+        if _type == Assember.VIDEO:
+            o = utils.readObject(RootPath.output_video_object_dir, name)
+        elif _type == Assember.CHAPTER:
+            o = utils.readObject(RootPath.output_chapter_object_dir, name)
+        elif _type == Assember.COURSE:
+            o = utils.readObject(RootPath.output_course_object_dir, name)
+        if o:
+            return o.searchByKey(key, json_dumps)
+        # dosearch
+        return o
 
 
 # @wait Video内容的遍历，有开关控制是否延时加载，还是立即生成， 还有那个apply函数， 目前可以内嵌了， 作为初始化
@@ -168,7 +250,7 @@ class PaddleFrame:
         return "".join(self.txts)
 
     # @wait 将搜索的方法外置
-    def searchByKey(self, key, json_dumps=False):
+    def searchByKey(self, key, json_dumps=False, vo_process_func=Searcher.processPfVo):
         """
         :return [{box1相关信息}, {}, {}  ]= 关键帧的box位置的相关信息
             @wait返回True 还是, 返回在具体某个boxes的坐标, 有利于框出来
@@ -193,6 +275,8 @@ class PaddleFrame:
                 # })
                 boxes.append(self.boxes[i])
                 txts.append(self.txts[i])
+                # 搜索结果 -> 画ocr
+                # @tag
         # @wait 还可以有 keyword, 也就是每页中 又大又长的框框
 
         result = vo.Frame(
@@ -205,6 +289,9 @@ class PaddleFrame:
             time=self.time,
             title=self.getTitles(args.title_num),
         )
+
+        # @wait 将画的图片另存为
+        vo_process_func and vo_process_func(result)
         return utils.json_dumps(result) if json_dumps else result
 
     # def setOutPath(self, out_path):
@@ -409,7 +496,7 @@ class Video:
         self.output_dir = output_dir
         # self.kfs_out_put_dir = kfs_output_dir
 
-        self.path = video_path
+        self.local_path = video_path
         # self.parent_id = chapter_id
         self.chapter_id = chapter_id
         self.id = video_id
@@ -456,7 +543,7 @@ class Video:
                 kfs.append(pfvo)
 
         result = vo.Video(
-            id=self.id, kfs=kfs, name=self.name, chapter_id=self.chapter_id
+            id=self.id, kfs=kfs, name=self.name, local_path=self.local_path, chapter_id=self.chapter_id
         )
         return utils.json_dumps(result) if json_dumps else result
 
@@ -664,6 +751,9 @@ class Assember:
     """
     负责将用户指定的路径（课程，章节， 小节）： 装配出不同的对象（Course， Chapter， Video）
     """
+    COURSE = 'course'
+    CHAPTER = 'chapter'
+    VIDEO = 'video'
 
     @staticmethod
     def executeCourse(
@@ -741,6 +831,32 @@ class Assember:
             name=name,
         )
 
+    @classmethod
+    def execute(cls, _type, resource_root_path, output_dir='', id="", name="", parent_id=""):
+        output_object_path = ''
+        r = {}
+        if _type == cls.COURSE:
+            output_dir = output_dir or path.RootPath.output_courses_dir
+            output_object_path = path.RootPath.output_course_object_dir
+            r = cls.executeCourse(resource_root_path, output_dir, id, name)
+        elif _type == cls.CHAPTER:
+            output_dir = output_dir or path.RootPath.output_chapters_dir
+            output_object_path = path.RootPath.output_chapter_object_dir
+            r = cls.executeChapter(
+                resource_root_path, output_dir, id, name, parent_id)
+        elif _type == cls.VIDEO:
+            output_dir = output_dir or path.RootPath.output_videos_dir
+            output_object_path = path.RootPath.output_video_object_dir
+            r = cls.executeVideo(resource_root_path, output_dir,
+                                 video_id=id, chapter_id=parent_id, name=name)
+        if r:
+            r.name = utils.saveObject(output_object_path, r)
+        return r
+
+    @staticmethod
+    def set_step(step='fps', speed_x=1):
+        args.set_step(step, speed_x)
+
     @staticmethod
     def __filter_no_dir(paths):
         return list(filter(lambda p: os.path.isdir(p), paths))
@@ -764,22 +880,4 @@ class Assember:
         else:
             shutil.rmtree(dir_path)
             os.mkdir(dir_path)
-            # os.mkdir(dir_path)
-            # del_list = glob.glob( f'{dir_path}\\*' )
-            # for d_path in del_list:
-            #     if os.path.isfile(d_path):
-            #         os.remove( d_path )
-            #     else:
-            #         os.rmdir(d_path)
         return dir_path
-
-
-# class ResultBO:
-#     """
-#     PaddleFrame搜索结果对象
-#     """
-#
-#     def __init__(self, frame_id, box, txt, frame) -> None:
-#         self.frame_id = frame_id
-#         self.box = box
-#         self.txt = txt
