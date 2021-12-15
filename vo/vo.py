@@ -15,6 +15,7 @@ class Frame:
     name: str
     title: list
     img: str
+    img_local_path: str
     ms: int
     time: str
     txts: list

@@ -1,15 +1,14 @@
+from functools import reduce
 import time
-from paddle.fluid.layers.nn import pad
-from paddleocr import draw_ocr
 import filetype
 import shutil
 import copy as cp
 import glob
 import os
 import cv2 as cv
-from filetype.types import VIDEO
 import numpy as np
-from paddleocr import PaddleOCR
+from numpy.lib.function_base import average
+from paddleocr import PaddleOCR, draw_ocr
 
 # import paddle
 
@@ -77,9 +76,11 @@ class Searcher:
         frame = utils.cvimread(file_path)
 
         im_show = draw_ocr(frame, pf.boxes)
+        im_show = cv.cvtColor(im_show, cv.COLOR_BGR2RGB)
         im_show = Image.fromarray(im_show)
         # im_show shape h,w,c
         # 图片的输出目录 定义
+
         output_dir = path.RootPath.output_search_result_dir
         output_dir = f'{output_dir}\\{cls.search_timestamp}'
         output_dir = Searcher.__setDir(output_dir)
@@ -133,8 +134,19 @@ class Searcher:
 # @requirement 不管是单个视频，还是章节， 还是课程， 都需要支持导出的功能，
 
 paddleOCR = PaddleOCR(
-    det_model_dir=RootPath.det_model_dir, rec_model_dir=RootPath.rec_model_dir
+    det_model_dir=RootPath.det_model_dir, rec_model_dir=RootPath.rec_model_dir,
+    cpu_threads=args.cpu_threads,
+    enable_mkldnn=args.enable_mkldnn,
+    det_db_box_thresh=args.det_db_box_thresh,
+    det_db_unclip_ratio=args.det_db_unclip_ratio
 )
+
+# paddleOCR_video_inner = PaddleOCR(
+#     det_model_dir=RootPath.det_model_dir, rec_model_dir=RootPath.rec_model_dir,
+#     cpu_threads=args.cpu_threads,
+#     enable_mkldnn=args.enable_mkldnn,
+#     det_db_box_thresh=args.det_db_box_thresh
+# )
 
 
 class PaddleFrame:
@@ -157,17 +169,21 @@ class PaddleFrame:
         @wait 具体的id形式, 具体再确定
         """
         self.id = id
+        self.frame = frame
+        self.is_into_iter = self.__is_into_iter()
+        if not self.is_into_iter:
+            return
+
         self.outpath = img_outpath
         self.video_id = video_id
         self.ms = ms
-        self.time = utils.msToH_M_S_str(self.ms)
         self.name = f"{video_id}{args.img_name_gap}{self.id}"
-        self.frame = frame
         self.blur_score = cv.Laplacian(frame, cv.CV_32F).var()
         """
         @wait 返回的结果是否需要去除 停用词
         @performance 把np.array去除, 因为只有txts使用到np.array方法
         """
+
         self.result = np.array(paddleOCR.ocr(frame, cls=False))
         if len(self.result) == 0:
             self.has_txt = False
@@ -183,6 +199,30 @@ class PaddleFrame:
                 list(map(lambda x: x[1], self.result[:, 1])))
             self.avg_score = np.mean(self.scores)
             # self._save() # 有结果, 图片才需要保存
+
+    def __is_into_iter(self) -> bool:
+
+        boxes = paddleOCR.text_detector(self.frame)[0]
+        boxes_num = len(boxes)
+        if boxes_num == 0:
+            return False
+
+        th_min_box_height = Video.th_min_box_height
+        print(f'th_min_box_height: {th_min_box_height}')
+        min_boxes_num = list(
+            filter(lambda box: (box[2][1]-box[0][1]) < th_min_box_height, boxes)).__len__()
+        print(f'min_boxes_num {min_boxes_num}')
+        if min_boxes_num > args.th_min_boxes_num:
+            return False
+
+        min_boxes_rate = min_boxes_num/boxes_num
+        print(f'min_boxes_rate: {min_boxes_rate}')
+        if min_boxes_rate > args.th_min_boxes_rate:
+            return False
+        # 暂时不考虑 用平均值
+        # average_height = reduce(lambda box: box[2][1] - box[0][1], boxes)/boxes_num
+
+        return True
 
     def getTitles(self, nums=1):
         """
@@ -278,20 +318,21 @@ class PaddleFrame:
                 # 搜索结果 -> 画ocr
                 # @tag
         # @wait 还可以有 keyword, 也就是每页中 又大又长的框框
-
         result = vo.Frame(
             id=self.id,
             img=self.img,
+            img_local_path=self.img_local_path,
             boxes=boxes,
             name=self.name,
             txts=txts,
             ms=self.ms,
-            time=self.time,
+            time=utils.msToH_M_S_str(self.ms),
             title=self.getTitles(args.title_num),
         )
 
         # @wait 将画的图片另存为
-        vo_process_func and vo_process_func(result)
+        if not result.isEmpty():
+            vo_process_func and vo_process_func(result)
         return utils.json_dumps(result) if json_dumps else result
 
     # def setOutPath(self, out_path):
@@ -312,24 +353,11 @@ class PaddleFrame:
         img_url = img_url.replace('\\', '/')
         print(f"img_url: {img_url}")
         self.img = img_url
-
+        self.img_local_path = img_path
         # @risk 删除属性, 节约持久化需要的内存
         del self.frame
         del self.result
 
-        # delattr( self, 'frame' )
-
-    # def save(self, out_path, name=None, postfix='jpg'):
-    #     if not name:
-    #         name = self.name
-    #     img_path = f'{out_path}\\{name}.{postfix}'
-    #     cv.imwrite(img_path, self.frame)
-    #     self.img = img_path
-
-    # def save(self):
-    #     if not self.out_path:
-    #         raise RuntimeError('请先调用 setOutPath() 方法!')
-    #     cv.imwrite(f'{self.out_path}/{self.name}.jpg', self.frame)
     def getSimScore(self, pre_pf):
         """ "
         两帧之间文本相似度计算
@@ -481,6 +509,7 @@ class Video:
         4. 将该视频 转换为 图片
         5. 遍历功能, 设置一个插槽, 传入一个处理函数
     """
+    th_min_box_height = ''
 
     def __init__(self, video_path, output_dir, video_id, chapter_id, name=""):
         """
@@ -512,6 +541,7 @@ class Video:
         self.height = self.cap.get(cv.CAP_PROP_FRAME_HEIGHT)
         self.frame_counts = self.cap.get(cv.CAP_PROP_FRAME_COUNT)
 
+        Video.th_min_box_height = args.update_th_min_box_height(self.height)
         if args.step == "fps":
             self.step = self.fps * args.speed_x
         else:
@@ -556,12 +586,13 @@ class Video:
 
     def _iter_func(self, pf):
         print("------------------------------")
-        print(f"有效帧数: {len( self.kfs )}")
+        print(f"有效帧数: {len( self.kfs )}  当前帧: {pf.id}")
         # cv.imshow('v1', pf.frame)
         # cv.waitKey(1)
         # 增加模糊度, 对比度判断
         # contrast_score = contrastScore(pf.frame)
-
+        if not pf.is_into_iter:
+            return
         print(
             f"{pf.name} / {self.frame_counts} \navg_score : {pf.avg_score} \nblur_score: {pf.blur_score}"
         )
@@ -605,8 +636,11 @@ class Video:
                         self.kfs.updateTail(pf)
                     else:
                         self.kfs.add(pf)
+                        print(
+                            f"上一帧内容: {self.old_frame.getAllTextArray()}   这一帧率的内容: {pf.getAllTextArray()}")
+                        print(f"加入一帧率: {pf.name}  frame_id: {pf.id}")
                     # self.old_frame = origin_pf
-                elif pf.getBoxesLen() < self.old_frame.getBoxesLen():
+                elif pf.getBoxesLen() < self.old_frame.getBoxesLen():  # 内容减少
                     self.old_frame = origin_pf
                     pass
 
@@ -619,6 +653,9 @@ class Video:
                             self.kfs.updateTail(tail_frame)
                         # self.old_frame = origin_pf
             else:
+                print(
+                    f"上一帧内容: {self.old_frame.getAllTextArray()}   这一帧率的内容: {pf.getAllTextArray()}")
+                print(f"加入一帧率: {pf.name}  frame_id: {pf.id}")
                 self.kfs.add(pf)
 
             # 指定一系列过滤条件
@@ -633,6 +670,8 @@ class Video:
             if ret:
                 frame_id = int(self.cap.get(cv.CAP_PROP_POS_FRAMES)) - 1
                 frame_ms = self.cap.get(cv.CAP_PROP_POS_MSEC)
+
+                ### 增加一层, 框框数太多, 为代码也, 框框的高度大小, 代码也
                 self._iter_func(
                     PaddleFrame(
                         frame_id, frame, frame_ms, self.output_dir, self.id

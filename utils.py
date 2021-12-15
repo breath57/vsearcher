@@ -101,17 +101,18 @@ def url2local(url):
 
 
 # @wait
-def copy_video_by_img_url(local_path, img_url, file_name='v'):
+def copy_video_by_img_local_path(video_local_path, img_local_path, file_name='v'):
     """
     将视频在电脑的位置，拷贝到img_url对应在本地的文件夹中的位置，
     然后生成视频支持的http访问的url 
     """
-    video_format = local_path.split('.')[-1]
-    local_img_path = url2local(img_url)
-    dest = local_img_path.replace(
-        local_img_path.split('\\')[-1], f'{file_name}.{video_format}')
+    video_format = video_local_path.split('.')[-1]
+    # local_img_path = url2local(img_local_path)
+    # img_local_path  /12321.png
+    dest = img_local_path.replace(
+        img_local_path.split('\\')[-1], f'{file_name}.{video_format}')
     if not os.path.exists(dest):
-        shutil.copy(local_path, dest)
+        shutil.copy(video_local_path, dest)
     video_url = local2url(dest)
     return video_url
 
