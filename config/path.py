@@ -46,3 +46,13 @@ class RootPath:
     # paddleocr 文字检测 和 文字分类模型 | 最新版可以自行去git的paddleocr查看, 将此处的路径末尾改名字即可自动下载
     det_model_dir = f'{_model_dir}\\ocr\\paddle\\ch_ppocr_mobile_v2.0_det_infer'
     rec_model_dir = f'{_model_dir}\\ocr\\paddle\\ch_ppocr_mobile_v2.0_rec_infer'
+
+
+for k in RootPath.__dict__.keys():
+    # new_temp = list(RootPath.__dict__[k])
+    # new_temp[0] = new_temp[0].upper()
+    print(k)
+    # RootPath.__dict__[k] = ''.join(new_temp)
+
+print(f'最开始 RootPath.output_videos_dir: {RootPath.output_videos_dir}')
+print(RootPath.__dict__)

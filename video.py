@@ -1,5 +1,5 @@
-from functools import reduce
 import time
+from typing import List
 import filetype
 import shutil
 import copy as cp
@@ -7,9 +7,8 @@ import glob
 import os
 import cv2 as cv
 import numpy as np
-from numpy.lib.function_base import average
 from paddleocr import PaddleOCR, draw_ocr
-
+import os
 # import paddle
 
 from . import utils
@@ -21,7 +20,6 @@ from .vo import vo
 from vsearch.config import path
 
 if args.use_gpu:
-    import os
     import paddle
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -67,35 +65,43 @@ class Searcher:
 
     @classmethod
     def processPfVo(cls, pf: vo.Frame, unique_file_name=""):
+        """
+        功能: 将pf中的img_url更改为搜索结果,并且可提供第三方访问的url
+            cls: 就是Search, 代表class, 类名
+            pf: 为搜索结果帧
+        """
         # @wait 文件名包含 key, 可以避免重复请求 处理返回
         # @performance wait 算法流程优化
         # @wait 程名 + 章节名 + 视频名称 + key
         print('需要读取的图片路径')
         # http://127.0.0.1:5000/static/vsearch-output/videos/pattern_pure_ppt/-0.png'
-        file_path = utils.url2local(pf.img)
+        file_path = utils.url2local(pf.img)  # url路径转本地路径
         frame = utils.cvimread(file_path)
 
-        im_show = draw_ocr(frame, pf.boxes)
-        im_show = cv.cvtColor(im_show, cv.COLOR_BGR2RGB)
+        im_show = draw_ocr(frame, pf.boxes)  # 圈出搜索结果
+        im_show = cv.cvtColor(im_show, cv.COLOR_BGR2RGB)  # 修正色域为Image读取正常
         im_show = Image.fromarray(im_show)
         # im_show shape h,w,c
-        # 图片的输出目录 定义
 
+        # 图片的输出目录 定义
         output_dir = path.RootPath.output_search_result_dir
-        output_dir = f'{output_dir}\\{cls.search_timestamp}'
+        output_dir = f'{output_dir}\\{cls.search_timestamp}'  # 构建输出目录
         output_dir = Searcher.__setDir(output_dir)
+
+        # 用时间标识每次产出的图片的唯一性, 符合url的唯一定位特点
         file_path = f'{output_dir}\\_{int(time.time_ns())%100000000}_.{args.img_format}'
         print(f"处理过的图片保存路径: {file_path}")
-        im_show.save(file_path)  # 结果图片保存在代码同级文件夹中。
+        im_show.save(file_path)  # 结果图片保存在代码同级文件夹中, (output_dir下更准确)
         img_url = utils.local2url(file_path)
-        pf.img = img_url
+        pf.img = img_url  # 此时的 pf中的img_url为框出搜索结果的图片url
         print(f"图片url: {img_url}")
         return pf
         # 图片保存
 
     @staticmethod
-    def __setDir(dir_path):
+    def __setDir(dir_path: str):
         """
+        设置搜索结果图片保存的根目录
         如果目录不存在, 就创建目录; 存在不处理
         :param dir_path:
         :return:
@@ -109,10 +115,18 @@ class Searcher:
 
     @classmethod
     def __reset_time_stamp(cls):
+        """
+        功能: 生成此处所有搜索的时间戳
+        作用: 用于一次搜索结果图片的内容存放目录的唯一标识
+        """
         cls.search_timestamp = str(int(time.time()))
 
     @classmethod
-    def search(cls, _type, name, key, json_dumps=False):
+    def search(cls, _type, name: str, key: str, json_dumps=False) -> object:
+        """
+            功能: 根据搜索关键字返回各种各样的搜索结果
+            @param: json_dumps  是否进行对搜索结果进行json序列化
+        """
         # 重置搜索时间
         cls.__reset_time_stamp()
         o = None
@@ -122,7 +136,7 @@ class Searcher:
             o = utils.readObject(RootPath.output_chapter_object_dir, name)
         elif _type == Assember.COURSE:
             o = utils.readObject(RootPath.output_course_object_dir, name)
-        if o:
+        if o:  # 如果搜索到了内容
             return o.searchByKey(key, json_dumps)
         # dosearch
         return o
@@ -133,6 +147,7 @@ class Searcher:
 # @wait video图片保存的目录需要保存到配置目录
 # @requirement 不管是单个视频，还是章节， 还是课程， 都需要支持导出的功能，
 
+# PaddleOCR对象的创建, 方便后续算法的使用
 paddleOCR = PaddleOCR(
     det_model_dir=RootPath.det_model_dir, rec_model_dir=RootPath.rec_model_dir,
     cpu_threads=args.cpu_threads,
@@ -167,10 +182,16 @@ class PaddleFrame:
     def __init__(self, id, frame, ms, img_outpath, video_id=""):
         """
         @wait 具体的id形式, 具体再确定
+        params:
+            id: 帧id
+            frame: opencv读取的图片的具体帧, 是一个特定的数组        
+            ms: 处于该视频中的播放位置
+            img_outpath: 图片的保存路径
+            video_id: 该帧所属的视频的id
         """
         self.id = id
         self.frame = frame
-        self.is_into_iter = self.__is_into_iter()
+        self.is_into_iter = self.__is_into_iter()  # @improvement 算是性能优化, 可以让下面的代码不需要执行
         if not self.is_into_iter:
             return
 
@@ -184,41 +205,66 @@ class PaddleFrame:
         @performance 把np.array去除, 因为只有txts使用到np.array方法
         """
 
-        self.result = np.array(paddleOCR.ocr(frame, cls=False))
-        if len(self.result) == 0:
+        self.result = np.array(paddleOCR.ocr(frame, cls=False))  # 提取帧中的内容
+        if len(self.result) == 0:  # 如果帧中没有内容
             self.has_txt = False
             self.boxes = np.array([])
             self.txts = np.array([])
             self.scores = np.array([])
             self.avg_score = 0
-        else:
+        else:  # 如果帧中有内容
             self.has_txt = True
             self.boxes = np.array(self.result[:, 0])
-            self.txts = np.array(list(map(lambda x: x[0], self.result[:, 1])))
+            self.txts = np.array(
+                list(map(lambda x: x[0], self.result[:, 1])))  # 将所有OCR文字拼接为字符串
             self.scores = np.array(
-                list(map(lambda x: x[1], self.result[:, 1])))
+                list(map(lambda x: x[1], self.result[:, 1])))  # @noting 统计所有检测框的分数? 文字的分数还是框是否正确的分数
+            # @noting 平均分数, 作用: 用于筛选 需要文字识别的框? 好像不需要
             self.avg_score = np.mean(self.scores)
             # self._save() # 有结果, 图片才需要保存
 
-    def __is_into_iter(self) -> bool:
+    def __is_into_iter(self):
+        """
+           作用: 设定一系列条件, 判断当前帧是否需要,进行迭代的处理, 还是直接废弃
+        """
 
+        # 无内容过滤
         boxes = paddleOCR.text_detector(self.frame)[0]
         boxes_num = len(boxes)
+        print(f'boxes_num: {boxes_num}')
         if boxes_num == 0:
             return False
 
         th_min_box_height = Video.th_min_box_height
         print(f'th_min_box_height: {th_min_box_height}')
+
+        # 代码行数过滤
+        # @wait 可以训练一个代码识别器, 直接判断是否是代码页
+        # @risk 不是代码框的也会被识别成代码框过滤
+        max_codeline_num = list(
+            filter(lambda box: (box[2][1]-box[0][1]) < th_min_box_height and (box[1][0] - box[0][0]) > th_min_box_height*args.height_multiple_x, boxes)).__len__()  # 根据候选框的框高 和 框的长度过滤, 计算过滤后的代码框的数量
+        print(f'min_codeline_num: {max_codeline_num}')
+        if max_codeline_num > args.th_max_codeline_num:
+            return False
+
+        # # 框数过滤
+        # print(f'boxes_num: {boxes_num}')
+        # if boxes_num > args.th_max_boxes_num:
+        #     return False
+
+        # 最小框数量过滤
         min_boxes_num = list(
             filter(lambda box: (box[2][1]-box[0][1]) < th_min_box_height, boxes)).__len__()
         print(f'min_boxes_num {min_boxes_num}')
         if min_boxes_num > args.th_min_boxes_num:
             return False
 
+        # 最小框比例过滤
         min_boxes_rate = min_boxes_num/boxes_num
         print(f'min_boxes_rate: {min_boxes_rate}')
         if min_boxes_rate > args.th_min_boxes_rate:
             return False
+
         # 暂时不考虑 用平均值
         # average_height = reduce(lambda box: box[2][1] - box[0][1], boxes)/boxes_num
 
@@ -255,12 +301,10 @@ class PaddleFrame:
             indexs.append(dicts.get(w))
         return self.txts[indexs]
 
-    def getBoxesLen(self):
-        return len(self.boxes)
-
     def _getLeftUpWeight(self, index):
         """
         说明: 权重值越小, 则越重要
+        作用: 为了判别当前帧中的标题
         """
         box = self.boxes[index]
         # box[0]代表左上方的坐标, box[0][0] + box[0][1]越小, 说明越在左上方
@@ -270,6 +314,7 @@ class PaddleFrame:
         """
         说明: 为了减少一次argsort的排序, 权重值越小, 则越重要
         具体的权重计算还需要验证
+        作用: 为了判别当前宽框是标题的可能性
         @wait
         """
         # txt = self.txts[index]
@@ -283,10 +328,20 @@ class PaddleFrame:
         # return txt_height * 0.7 + txt_len * 0.3
         return -(txt_height)
 
-    def getAllTextArray(self):
+    def getBoxesLen(self):
+        return len(self.boxes)
+
+    def getAllTextArray(self) -> list:
+        """
+            功能: 数据的形式返回所有文本
+        """
         return self.txts
 
-    def getAllTextStr(self):
+    def getAllTextStr(self) -> str:
+        """
+            功能: 将所有的文本变成字符串统一返回
+            @risk 没有任何分隔符号进行拼接
+        """
         return "".join(self.txts)
 
     # @wait 将搜索的方法外置
@@ -297,13 +352,15 @@ class PaddleFrame:
             @wait @performance好的搜索算法, 或者搜索这一步, 可以放到全局, 而不是每一个帧都搜索一次
             @improvement 将key进行分词 -> 逐搜索 -> 去重 -> 返回结果
             @improvement 支持语义: embedding为词向量 -> 余弦相似度搜索
+        :params:
+            vo_process_func(pfVo: vo.Frame): 将返回结果PfVo, 进行预处理函数, 
         """
         # result = []
         key = key.casefold()
         boxes = []
         txts = []
         for i, t in enumerate(self.txts):
-            if t.casefold().find(key) != -1:
+            if t.casefold().find(key) != -1:  # 全部转为小写进行搜索
                 # @wait 数据返回的格式待定
                 # result.append({
                 #     'id': self.id,
@@ -332,7 +389,8 @@ class PaddleFrame:
 
         # @wait 将画的图片另存为
         if not result.isEmpty():
-            vo_process_func and vo_process_func(result)
+            vo_process_func and vo_process_func(
+                result)  # 保证vo_process_func存在的情况下, 处理vo
         return utils.json_dumps(result) if json_dumps else result
 
     # def setOutPath(self, out_path):
@@ -340,7 +398,7 @@ class PaddleFrame:
 
     def save(self):
         img_path = f"{self.outpath}\\{self.name}.{args.img_format}"
-
+        print(f'img_path: {img_path}')
         # @note 中文路径图片保存
         cv.imencode(f".{args.img_format}", self.frame)[1].tofile(img_path)
         # @risk 图片的读取 : 这里指定的类型为 uint8 为0-255, BRG模式, 如果有其他色域的图片, 将不适用
@@ -385,8 +443,17 @@ class PaddleFrame:
 
 
 class KeyFrames:
+    """
+       存储每个视频的关键帧, 提供关键帧的一些操作
+       功能: 
+        1. 可以for in迭代
+        2. 替换尾部元素, 等其它对关键帧列表的增删改查
+        3. 帧去重,  @wait 但是无法去重 间隔较远的帧, 可以每隔x帧为一个窗口去重, 或者, 保留信息, 因为有些帧的重出现是有必要的在pdf中, 那就可以去重短期的, 不过目前生成的帧已经可以不用去重得到的就是去重后的结果了
+        4. 保存帧为图像到本地, 即调用paddleFrame的save方法
+    """
+
     def __init__(self):
-        self.frame_list = []
+        self.frame_list = []  # PaddleFrame List
 
     # def save(self):
     #     out_path = self
@@ -489,6 +556,7 @@ class KeyFrames:
 
     def saveKfs(self):
         for kf in self.frame_list:
+            PaddleFrame().img_local_path
             kf.save()
 
     # def _isSim(self, pf1: PaddleFrame, pf2: PaddleFrame):
@@ -508,7 +576,15 @@ class Video:
         3. 根据帧号获取视频的播放时间, 单位: 毫秒
         4. 将该视频 转换为 图片
         5. 遍历功能, 设置一个插槽, 传入一个处理函数
+        @wait 加入将视频帧转pdf课件的功能
+        6.
     """
+
+    # def saveToPDF(self):
+    #     paths =
+    #     for pf in self.kfs.getList():
+    #         PaddleFrame().img_local_path
+
     th_min_box_height = ''
 
     def __init__(self, video_path, output_dir, video_id, chapter_id, name=""):
@@ -518,10 +594,12 @@ class Video:
         """
         # if not video_path:
         #     raise FileExistsError('Please correct video path!')
+
         if not name:
-            self.name = video_path.split("\\")[-1].split(".")[0]
+            self.name = video_path.split(".")[0]
         else:
             self.name = name
+
         self.output_dir = output_dir
         # self.kfs_out_put_dir = kfs_output_dir
 
@@ -535,7 +613,7 @@ class Video:
             self.pre_id = f"{chapter_id}.{self.id}"
         self.kfs = KeyFrames()
 
-        self.cap = cv.VideoCapture(video_path)
+        self.cap = cv.VideoCapture(video_path)  # 获取指定路径的视频对象
         self.fps = self.cap.get(cv.CAP_PROP_FPS)
         self.width = self.cap.get(cv.CAP_PROP_FRAME_WIDTH)
         self.height = self.cap.get(cv.CAP_PROP_FRAME_HEIGHT)
@@ -557,11 +635,13 @@ class Video:
         self.kfs = self.kfs.getList()
         del temp
         del self.cap
-
         # if run:
         #     self._run()
 
     def searchByKey(self, key, json_dumps=False):
+        """
+            视频内容的搜索方法
+        """
         kfs = []
         for pf in self.kfs:
             pfvo = pf.searchByKey(key)
@@ -577,14 +657,17 @@ class Video:
         )
         return utils.json_dumps(result) if json_dumps else result
 
-    def getTimeMsByFrameID(self, frame_id):
-        """
-        帧编号 转换为 该视频播放位置的 毫秒数
-        @return millisecond
-        """
-        return frame_id / self.fps * 1000
+    # def getTimeMsByFrameID(self, frame_id):
+    #     """
+    #     帧编号 转换为 该视频播放位置的 毫秒数
+    #     @return millisecond
+    #     """
+    #     return frame_id / self.fps * 1000
 
-    def _iter_func(self, pf):
+    def _iter_func(self, pf: PaddleFrame):
+        """
+            对__run方法遍历的帧进行相关的处理, 判断是否需要加入关键帧集合
+        """
         print("------------------------------")
         print(f"有效帧数: {len( self.kfs )}  当前帧: {pf.id}")
         # cv.imshow('v1', pf.frame)
@@ -611,6 +694,7 @@ class Video:
             self.old_frame = pf
             self.kfs.add(pf)
         else:
+            # @wait 具体的相似度算法可以参考策略模式, 将具体使用哪个相似度算法, 抽象成接口, 或者配置, 可以直接切换, 而不是这里写死
             ret, sim_score1 = pf.getSimScoreV4(self.old_frame)
             sim_score = 0
 
@@ -626,13 +710,14 @@ class Video:
             # @performance 去重的操作如果影响性能, 可以提供用户点击去重效果
             print(f"sim_score: {sim_score}")
             # @wait 逆向相似度 > 正向相似度, 说明在减少内容, 是动画
+
             # 内容增加判断
             if sim_score > args.th_sim_score:  # 判断是否相似
                 # 增加内容的比较, 也要和 tail末尾的比较, 不过得相似的前提下
-                if pf.getBoxesLen() > self.old_frame.getBoxesLen():  # 判断内容是否增加
+                if pf.getBoxesLen() > self.old_frame.getBoxesLen():  # 内容增加
                     pf.ms = self.old_frame.ms
                     pf.name = pf.name + f"%{self.old_frame.id}"
-                    if len(self.kfs) > 0:
+                    if len(self.kfs) > 0:  # 如果关键帧列表不为空
                         self.kfs.updateTail(pf)
                     else:
                         self.kfs.add(pf)
@@ -641,7 +726,7 @@ class Video:
                         print(f"加入一帧率: {pf.name}  frame_id: {pf.id}")
                     # self.old_frame = origin_pf
                 elif pf.getBoxesLen() < self.old_frame.getBoxesLen():  # 内容减少
-                    self.old_frame = origin_pf
+                    self.old_frame = origin_pf  # 为了保留上一帧的特性
                     pass
 
                 else:  # 图片内容相同, 且内容没有增加了,
@@ -652,7 +737,7 @@ class Video:
                             tail_frame.frame = pf.frame
                             self.kfs.updateTail(tail_frame)
                         # self.old_frame = origin_pf
-            else:
+            else:  # 不相似
                 print(
                     f"上一帧内容: {self.old_frame.getAllTextArray()}   这一帧率的内容: {pf.getAllTextArray()}")
                 print(f"加入一帧率: {pf.name}  frame_id: {pf.id}")
@@ -665,12 +750,15 @@ class Video:
         print("------------------------------")
 
     def _run(self):
+        """
+            迭代函数, 按配置的帧间隔读取视频帧,
+        """
         while True:
             ret, frame = self.cap.read()
             if ret:
                 frame_id = int(self.cap.get(cv.CAP_PROP_POS_FRAMES)) - 1
                 frame_ms = self.cap.get(cv.CAP_PROP_POS_MSEC)
-
+                print(f'进度: {frame_id}/{self.cap.get(cv.CAP_PROP_FRAME_COUNT)}')
                 ### 增加一层, 框框数太多, 为代码也, 框框的高度大小, 代码也
                 self._iter_func(
                     PaddleFrame(
@@ -708,7 +796,8 @@ class Video:
 
 
 class Chapter:
-    def __init__(self, id, name, course_id, videos: list) -> None:
+
+    def __init__(self, id: int, name: str, course_id: int, videos: List[Video]) -> None:
         self.id = id
         self.name = name
         self.course_id = course_id
@@ -764,7 +853,7 @@ class Course:
 
     """
 
-    def __init__(self, id, name, chapters: list = []) -> None:
+    def __init__(self, id, name, chapters: List[Chapter] = []) -> None:
         self.id = id
         self.name = name
         self.chapters = chapters
@@ -772,7 +861,7 @@ class Course:
     def __getitem__(self, index):
         return self.chapters[index]
 
-    def searchByKey(self, key, json_dumps=False):
+    def searchByKey(self, key, json_dumps=False) -> vo.Course:
         chapters = []
         for c in self.chapters:
             chapter_vo = c.searchByKey(key)
@@ -789,6 +878,7 @@ class Course:
 class Assember:
     """
     负责将用户指定的路径（课程，章节， 小节）： 装配出不同的对象（Course， Chapter， Video）
+    这样就可以直接使用装配好的对象的方法进行操作
     """
     COURSE = 'course'
     CHAPTER = 'chapter'
@@ -796,14 +886,15 @@ class Assember:
 
     @staticmethod
     def executeCourse(
-        course_root_path, output_dir=RootPath.output_courses_dir, course_id="", name=""
+        course_root_path, output_dir=RootPath.output_courses_dir, course_id="", dir_name=""
     ) -> Course:
+
         chapter_dirs = glob.glob(f"{course_root_path}\\*")
         # 过滤非目录文件
         chapter_dirs = Assember.__filter_no_dir(chapter_dirs)
-        name = name or course_root_path.split("\\")[-1]
+        dir_name = dir_name or os.path.basename(course_root_path)  # 获取目录名
         # 初始化 输出目录
-        output_dir = output_dir + "\\" + name
+        output_dir = output_dir + "\\" + dir_name
         # @modified 修改了路径
         output_dir = Assember._setDir(output_dir)
 
@@ -812,12 +903,12 @@ class Assember:
                 chapter_path=dir_path,
                 output_dir=output_dir,
                 chapter_id=i + 1,
-                chapter_name=dir_path.split("\\")[-1],
+                chapter_name=os.path.basename(dir_path),
                 course_id=course_id,
             )
             for i, dir_path in enumerate(chapter_dirs)
         ]
-        return Course(id=course_id, name=name, chapters=chapters)
+        return Course(id=course_id, name=dir_name, chapters=chapters)
 
     @staticmethod
     def executeChapter(
@@ -831,7 +922,7 @@ class Assember:
         # @risk 视频类型的过滤器可能有隐藏的bug
         video_paths = glob.glob(f"{chapter_path}\\*")
         video_paths = Assember.__filter_no_video_file(video_paths)
-        chapter_name = chapter_name or chapter_path.split("\\")[-1]
+        chapter_name = chapter_name or os.path.basename(chapter_path)  # 获取目录名
         output_dir = output_dir + "\\" + chapter_name
         # @modified 修改了路径
         output_dir = Assember._setDir(output_dir)
@@ -856,9 +947,10 @@ class Assember:
         chapter_id="",
         name="",
     ) -> Video:
+        print(f'RootPath.output_videos_dir: {RootPath.output_videos_dir}')
         print(f"output_dir: {output_dir}")
         output_dir = output_dir + (
-            name or ("\\" + video_path.split("\\")[-1].split(".")[0])
+            name or ("\\" + os.path.basename(video_path).split(".")[0])
         )
         # @modified 修改了路径
         output_dir = Assember._setDir(output_dir)
@@ -907,6 +999,7 @@ class Assember:
     @staticmethod
     def _setDir(dir_path):
         """
+        作用: 设定存放处理结果的目录
         如果目录不存在, 就创建目录; 存在就清空目录下的文件
         :param dir_path:
         :return:

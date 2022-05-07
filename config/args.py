@@ -10,25 +10,34 @@ th_sim_score = 0.82  # 前后两帧相似度
 th_blur_score = 60  # 可以依靠统计 均值来定 | 根据视频的分别率来定
 
 # 如果视频画面大小为 1920 *1080, 则 最小的高度为50像素, 其他比例的画面, 会自动根据1920*1080的标准进行缩放, 故按照1920 * 1080的假设来设置阈值
-th_min_box_height = 44
-th_min_boxes_num = 40
-th_min_boxes_rate = 0.83
+th_min_box_height = 40
 
-use_gpu = True
-gpu_name = 'gpu:0'
+th_min_boxes_num = 50  # 低于 th_min_box_height 阈值的框
+th_min_boxes_rate = 0.9  # 最小框的比例, 超过该比例判断为内容过多, 不容易观看, 很大可能不是PPT
+
+#  代码行过滤相关
+height_multiple_x = 6  # 假设代码框, w/h的比值为 height_multiple_x
+th_max_codeline_num = 7  # 最大代码框的数量, 大于该值判断为代码页
+
+
+# th_max_boxes_num = 66  # 所有框的数量不能大于
+
+
+use_gpu = True  # 是否使用GPU
+gpu_name = 'gpu:0'  # 指定gpu
 
 title_num = 3  # 帧获取的标题数量
 
 img_format = "png"  # 图片保存的格式
-img_name_gap = "-"
-img_url_prefix = "http://127.0.0.1:5000"
+img_name_gap = "-"  # 1-1072%804.png | 1代表章节
+img_url_prefix = "http://127.0.0.1:5000"  # 第三方访问图片路径的域名? 本地图片存储的位置
 # video_format= ['mp4', 'flv', 'avi', 'wmv', 'mpg', 'mpeg'] # 其他格式还未测试
 
 # paddleOCR args
 cpu_threads = 100
 enable_mkldnn = True
 det_db_unclip_ratio = 2.2
-det_db_box_thresh = 0.65
+det_db_box_thresh = 0.5
 
 
 def set_step(step_="fps", speed_x_=1):
