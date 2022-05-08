@@ -14,7 +14,7 @@ class Frame:
     id: int
     name: str
     title: list
-    img: str
+    img_url: str
     img_local_path: str
     ms: int
     time: str

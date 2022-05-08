@@ -9,7 +9,7 @@ def getProjectRootPath():
 
 def getThisPackageRootPath():
     r = __name__.replace('.', '\\')
-    # @risk 不能随意切换到其他目录, 修复方案: zai, __init__文件中获取相应的项目路径
+    # @RISK 不能随意切换到其他目录, 修复方案: zai, __init__文件中获取相应的项目路径
     i = r.index('config')
     return getProjectRootPath() + "\\" + r[:i-1]
 

@@ -1,5 +1,7 @@
+from pathlib import Path
 import time
 from typing import List
+from unittest import result
 import filetype
 import shutil
 import copy as cp
@@ -9,6 +11,8 @@ import cv2 as cv
 import numpy as np
 from paddleocr import PaddleOCR, draw_ocr
 import os
+
+from prometheus_client import Enum
 # import paddle
 
 from . import utils
@@ -20,10 +24,11 @@ from .vo import vo
 from vsearch.config import path
 
 if args.use_gpu:
+    print('启用GPU............')
     import paddle
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-    # @risk 判断设备是否存在 再设置
+    # @RISK 判断设备是否存在 再设置
     if paddle.get_device() != 'cpu':
         paddle.set_device(args.gpu_name)
     print(f'current use device: {args.gpu_name}')
@@ -35,7 +40,7 @@ PaddleFrame遍历完后, 自动去除cap对象,
 args.speed_x
 del self.cap self.result 将 paddleOCR置出 节约持久化
 """
-# @risk 环境迁移之后没有cuda可能会报错
+# @RISK 环境迁移之后没有cuda可能会报错
 # paddle.device.set_device('gpu:0')
 # class Frame():
 #     """
@@ -50,7 +55,7 @@ del self.cap self.result 将 paddleOCR置出 节约持久化
 #         pass
 
 from PIL import Image
-# @wait 设计的不合理
+# @WAIT 设计的不合理
 
 
 class Searcher:
@@ -70,12 +75,12 @@ class Searcher:
             cls: 就是Search, 代表class, 类名
             pf: 为搜索结果帧
         """
-        # @wait 文件名包含 key, 可以避免重复请求 处理返回
-        # @performance wait 算法流程优化
-        # @wait 程名 + 章节名 + 视频名称 + key
+        # @WAIT 文件名包含 key, 可以避免重复请求 处理返回
+        # @PERFORMANCE wait 算法流程优化
+        # @WAIT 程名 + 章节名 + 视频名称 + key
         print('需要读取的图片路径')
         # http://127.0.0.1:5000/static/vsearch-output/videos/pattern_pure_ppt/-0.png'
-        file_path = utils.url2local(pf.img)  # url路径转本地路径
+        file_path = utils.url2local(pf.img_url)  # url路径转本地路径
         frame = utils.cvimread(file_path)
 
         im_show = draw_ocr(frame, pf.boxes)  # 圈出搜索结果
@@ -93,7 +98,7 @@ class Searcher:
         print(f"处理过的图片保存路径: {file_path}")
         im_show.save(file_path)  # 结果图片保存在代码同级文件夹中, (output_dir下更准确)
         img_url = utils.local2url(file_path)
-        pf.img = img_url  # 此时的 pf中的img_url为框出搜索结果的图片url
+        pf.img_url = img_url  # 此时的 pf中的img_url为框出搜索结果的图片url
         print(f"图片url: {img_url}")
         return pf
         # 图片保存
@@ -106,8 +111,9 @@ class Searcher:
         :param dir_path:
         :return:
         """
-        # @modify 为了可以找到图片的路径
-        dir_path = dir_path.replace(" ", "%").replace("\t", "%")
+        # @MODIFY 为了可以找到图片的路径, 就是有空格的情况
+        dir_path = dir_path.replace(" ", args.path_space_fill_char).replace(
+            "\t", args.path_space_fill_char)
         if not os.path.exists(dir_path):
             os.makedirs(dir_path, mode=0o777, exist_ok=True)
             # os.mkdir( dir_path )
@@ -142,10 +148,10 @@ class Searcher:
         return o
 
 
-# @wait Video内容的遍历，有开关控制是否延时加载，还是立即生成， 还有那个apply函数， 目前可以内嵌了， 作为初始化
-# @wait 每种对象都需要可以支持传入输出路径，当然最终肯行是需要配置的，所以都是需要装配的
-# @wait video图片保存的目录需要保存到配置目录
-# @requirement 不管是单个视频，还是章节， 还是课程， 都需要支持导出的功能，
+# @WAIT Video内容的遍历，有开关控制是否延时加载，还是立即生成， 还有那个apply函数， 目前可以内嵌了， 作为初始化
+# @WAIT 每种对象都需要可以支持传入输出路径，当然最终肯行是需要配置的，所以都是需要装配的
+# @WAIT video图片保存的目录需要保存到配置目录
+# @REQUIREMENT 不管是单个视频，还是章节， 还是课程， 都需要支持导出的功能，
 
 # PaddleOCR对象的创建, 方便后续算法的使用
 paddleOCR = PaddleOCR(
@@ -181,7 +187,7 @@ class PaddleFrame:
 
     def __init__(self, id, frame, ms, img_outpath, video_id=""):
         """
-        @wait 具体的id形式, 具体再确定
+        @WAIT 具体的id形式, 具体再确定
         params:
             id: 帧id
             frame: opencv读取的图片的具体帧, 是一个特定的数组        
@@ -191,18 +197,18 @@ class PaddleFrame:
         """
         self.id = id
         self.frame = frame
-        self.is_into_iter = self.__is_into_iter()  # @improvement 算是性能优化, 可以让下面的代码不需要执行
+        self.is_into_iter = self.__is_into_iter()  # @IMPROVEMENT 算是性能优化, 可以让下面的代码不需要执行
         if not self.is_into_iter:
             return
 
         self.outpath = img_outpath
         self.video_id = video_id
         self.ms = ms
-        self.name = f"{video_id}{args.img_name_gap}{self.id}"
+        self.name = f"{video_id}{args.img_name_gap}{self.id}" if video_id != "" else f"{self.id}"
         self.blur_score = cv.Laplacian(frame, cv.CV_32F).var()
         """
-        @wait 返回的结果是否需要去除 停用词
-        @performance 把np.array去除, 因为只有txts使用到np.array方法
+        @WAIT 返回的结果是否需要去除 停用词
+        @PERFORMANCE 把np.array去除, 因为只有txts使用到np.array方法
         """
 
         self.result = np.array(paddleOCR.ocr(frame, cls=False))  # 提取帧中的内容
@@ -218,8 +224,8 @@ class PaddleFrame:
             self.txts = np.array(
                 list(map(lambda x: x[0], self.result[:, 1])))  # 将所有OCR文字拼接为字符串
             self.scores = np.array(
-                list(map(lambda x: x[1], self.result[:, 1])))  # @noting 统计所有检测框的分数? 文字的分数还是框是否正确的分数
-            # @noting 平均分数, 作用: 用于筛选 需要文字识别的框? 好像不需要
+                list(map(lambda x: x[1], self.result[:, 1])))  # @NOTING 统计所有检测框的分数? 文字的分数还是框是否正确的分数
+            # @NOTING 平均分数, 作用: 用于筛选 需要文字识别的框? 好像不需要
             self.avg_score = np.mean(self.scores)
             # self._save() # 有结果, 图片才需要保存
 
@@ -239,8 +245,8 @@ class PaddleFrame:
         print(f'th_min_box_height: {th_min_box_height}')
 
         # 代码行数过滤
-        # @wait 可以训练一个代码识别器, 直接判断是否是代码页
-        # @risk 不是代码框的也会被识别成代码框过滤
+        # @WAIT 可以训练一个代码识别器, 直接判断是否是代码页
+        # @RISK 不是代码框的也会被识别成代码框过滤
         max_codeline_num = list(
             filter(lambda box: (box[2][1]-box[0][1]) < th_min_box_height and (box[1][0] - box[0][0]) > th_min_box_height*args.height_multiple_x, boxes)).__len__()  # 根据候选框的框高 和 框的长度过滤, 计算过滤后的代码框的数量
         print(f'min_codeline_num: {max_codeline_num}')
@@ -273,8 +279,8 @@ class PaddleFrame:
     def getTitles(self, nums=1):
         """
         获取最有可能是标题的文本内容
-        @wait 获取标题, 或者说是该帧内的代表性文本列表
-        @risk 获取的title可能会有错误的概率
+        @WAIT 获取标题, 或者说是该帧内的代表性文本列表
+        @RISK 获取的title可能会有错误的概率
         """
         # 框框按照 y轴距离, 排序, 获取排序后的索引
         # 过滤掉 标点符号, 之类的内容, 就是除了中文和英文之外的内容
@@ -282,7 +288,7 @@ class PaddleFrame:
         # 因为有写 PPT的LOGO, 很大, 大过标题
         # 标题的位置, 一定是位于上半屏幕的
         # 是否: 去除连续好多页都出现的标题作为搜索关键词?, 不用去除, 还是当作PPT来应用
-        # @waitValidate
+        # @WAITValidate
         # print(self.txts)
         h_weights = [
             self._getHeightWeight(index) for index in range(self.boxes.shape[0])
@@ -315,11 +321,11 @@ class PaddleFrame:
         说明: 为了减少一次argsort的排序, 权重值越小, 则越重要
         具体的权重计算还需要验证
         作用: 为了判别当前宽框是标题的可能性
-        @wait
+        @WAIT
         """
         # txt = self.txts[index]
         box = self.boxes[index]
-        # @waitValidate
+        # @WAITValidate
         box_height = box[3][1] - box[0][1]
         # txt_width = box[1][0] - box[0][0]
         txt_height = box_height
@@ -340,18 +346,18 @@ class PaddleFrame:
     def getAllTextStr(self) -> str:
         """
             功能: 将所有的文本变成字符串统一返回
-            @risk 没有任何分隔符号进行拼接
+            @RISK 没有任何分隔符号进行拼接
         """
         return "".join(self.txts)
 
-    # @wait 将搜索的方法外置
+    # @WAIT 将搜索的方法外置
     def searchByKey(self, key, json_dumps=False, vo_process_func=Searcher.processPfVo):
         """
         :return [{box1相关信息}, {}, {}  ]= 关键帧的box位置的相关信息
-            @wait返回True 还是, 返回在具体某个boxes的坐标, 有利于框出来
-            @wait @performance好的搜索算法, 或者搜索这一步, 可以放到全局, 而不是每一个帧都搜索一次
-            @improvement 将key进行分词 -> 逐搜索 -> 去重 -> 返回结果
-            @improvement 支持语义: embedding为词向量 -> 余弦相似度搜索
+            @WAIT返回True 还是, 返回在具体某个boxes的坐标, 有利于框出来
+            @WAIT @PERFORMANCE好的搜索算法, 或者搜索这一步, 可以放到全局, 而不是每一个帧都搜索一次
+            @IMPROVEMENT 将key进行分词 -> 逐搜索 -> 去重 -> 返回结果
+            @IMPROVEMENT 支持语义: embedding为词向量 -> 余弦相似度搜索
         :params:
             vo_process_func(pfVo: vo.Frame): 将返回结果PfVo, 进行预处理函数, 
         """
@@ -361,7 +367,7 @@ class PaddleFrame:
         txts = []
         for i, t in enumerate(self.txts):
             if t.casefold().find(key) != -1:  # 全部转为小写进行搜索
-                # @wait 数据返回的格式待定
+                # @WAIT 数据返回的格式待定
                 # result.append({
                 #     'id': self.id,
                 #     'box': self.boxes[i],
@@ -374,10 +380,10 @@ class PaddleFrame:
                 txts.append(self.txts[i])
                 # 搜索结果 -> 画ocr
                 # @tag
-        # @wait 还可以有 keyword, 也就是每页中 又大又长的框框
+        # @WAIT 还可以有 keyword, 也就是每页中 又大又长的框框
         result = vo.Frame(
             id=self.id,
-            img=self.img,
+            img_url=self.img_url,
             img_local_path=self.img_local_path,
             boxes=boxes,
             name=self.name,
@@ -387,7 +393,7 @@ class PaddleFrame:
             title=self.getTitles(args.title_num),
         )
 
-        # @wait 将画的图片另存为
+        # @WAIT 将画的图片另存为
         if not result.isEmpty():
             vo_process_func and vo_process_func(
                 result)  # 保证vo_process_func存在的情况下, 处理vo
@@ -397,22 +403,23 @@ class PaddleFrame:
     #     self.out_path = out_path
 
     def save(self):
-        img_path = f"{self.outpath}\\{self.name}.{args.img_format}"
+        img_path = utils.unify_path(
+            f"{self.outpath}\\{self.name}.{args.img_format}")
         print(f'img_path: {img_path}')
         # @note 中文路径图片保存
         cv.imencode(f".{args.img_format}", self.frame)[1].tofile(img_path)
-        # @risk 图片的读取 : 这里指定的类型为 uint8 为0-255, BRG模式, 如果有其他色域的图片, 将不适用
+        # @RISK 图片的读取 : 这里指定的类型为 uint8 为0-255, BRG模式, 如果有其他色域的图片, 将不适用
         # cv.imdecode( np.fromfile(img_path, dtype=np.uint8 ), -1 )
         # 获取 root: vsearch-output  real: C/vsearch-output/
-        img_url = img_path.replace(
-            RootPath.project_root_dir, args.img_url_prefix)
+        # self.img_path = img_path
+        img_url = utils.local2url(img_path)
         # @modified 为了统一url路径, 而不是文件路径
-        # @wait 将所有路径统一为 / 而不是window下的 \\
-        img_url = img_url.replace('\\', '/')
+        # @WAIT 将所有路径统一为 / 而不是window下的 \\
+        # img_url = img_url.replace('\\', '/') # @MODIFY 修改为统一的
         print(f"img_url: {img_url}")
-        self.img = img_url
+        self.img_url = img_url
         self.img_local_path = img_path
-        # @risk 删除属性, 节约持久化需要的内存
+        # @RISK 删除属性, 节约持久化需要的内存
         del self.frame
         del self.result
 
@@ -448,7 +455,7 @@ class KeyFrames:
        功能: 
         1. 可以for in迭代
         2. 替换尾部元素, 等其它对关键帧列表的增删改查
-        3. 帧去重,  @wait 但是无法去重 间隔较远的帧, 可以每隔x帧为一个窗口去重, 或者, 保留信息, 因为有些帧的重出现是有必要的在pdf中, 那就可以去重短期的, 不过目前生成的帧已经可以不用去重得到的就是去重后的结果了
+        3. 帧去重,  @WAIT 但是无法去重 间隔较远的帧, 可以每隔x帧为一个窗口去重, 或者, 保留信息, 因为有些帧的重出现是有必要的在pdf中, 那就可以去重短期的, 不过目前生成的帧已经可以不用去重得到的就是去重后的结果了
         4. 保存帧为图像到本地, 即调用paddleFrame的save方法
     """
 
@@ -527,7 +534,7 @@ class KeyFrames:
     def remove_duplicate(self):
         """
         图片内容去重
-        @wait 应该保留图片清晰度较好的| 保留内容文字更多的 | 最后 内容还有 时间节点做更改
+        @WAIT 应该保留图片清晰度较好的| 保留内容文字更多的 | 最后 内容还有 时间节点做更改
         双向相似度
         """
         frame_list = self.frame_list
@@ -556,7 +563,6 @@ class KeyFrames:
 
     def saveKfs(self):
         for kf in self.frame_list:
-            PaddleFrame().img_local_path
             kf.save()
 
     # def _isSim(self, pf1: PaddleFrame, pf2: PaddleFrame):
@@ -565,6 +571,14 @@ class KeyFrames:
 
     def __len__(self):
         return self._len()
+
+
+class CWPathType(Enum):
+    """
+        定义生成后的课件返回地址的类型
+    """
+    LOCAL = 'local_path'  # 返回本地路径
+    URL = 'url'  # 返回第三方可以访问的URL
 
 
 class Video:
@@ -576,7 +590,7 @@ class Video:
         3. 根据帧号获取视频的播放时间, 单位: 毫秒
         4. 将该视频 转换为 图片
         5. 遍历功能, 设置一个插槽, 传入一个处理函数
-        @wait 加入将视频帧转pdf课件的功能
+        @WAIT 加入将视频帧转pdf课件的功能
         6.
     """
 
@@ -590,16 +604,16 @@ class Video:
     def __init__(self, video_path, output_dir, video_id, chapter_id, name=""):
         """
         ::name 如果没有传入, 默认视频的名称为name默认值
-        @wait 层级关系的设计后续还需要考虑
+        @WAIT 层级关系的设计后续还需要考虑
         """
         # if not video_path:
         #     raise FileExistsError('Please correct video path!')
 
         if not name:
-            self.name = video_path.split(".")[0]
+            self.name = Path(video_path).stem
         else:
             self.name = name
-
+        self.courseware_path = None
         self.output_dir = output_dir
         # self.kfs_out_put_dir = kfs_output_dir
 
@@ -630,7 +644,7 @@ class Video:
             self._run()  # 运行完成产出关键帧
             self.kfs.saveKfs()  # 将关键帧保存为文件
             del self.old_frame
-            # @risk 保存完成将 kfs: KeyFrame ->  kfs: list, 同时释放内存
+            # @RISK 保存完成将 kfs: KeyFrame ->  kfs: list, 同时释放内存
         temp = self.kfs
         self.kfs = self.kfs.getList()
         del temp
@@ -657,11 +671,25 @@ class Video:
         )
         return utils.json_dumps(result) if json_dumps else result
 
+    def __generate_courseware(self, path_type: CWPathType) -> str:
+        """ 生成课件
+        return 课件的本地地址
+        """
+        if not self.courseware_path:
+            # @MODIFY 如果课件不存在就会重新生成, 所以可以随便删除
+
+            imgs = [pf.img_local_path for pf in self.kfs]
+            self.courseware_path = utils.imgs2pdf(imgs, file_name=self.name)
+        # @RISKED 如果课件存在过期时间, 导致课件被删除怎么办?
+
+        # 因此 @WAIT 需要有一个判断地址是存在课件的方法
+        return self.courseware_path if path_type is CWPathType.LOCAL else utils.local2url(self.courseware_path)
+
+    def get_courseware_path(self, return_path_type: CWPathType = CWPathType.LOCAL):
+        return self.__generate_courseware(path_type=return_path_type)
     # def getTimeMsByFrameID(self, frame_id):
-    #     """
     #     帧编号 转换为 该视频播放位置的 毫秒数
     #     @return millisecond
-    #     """
     #     return frame_id / self.fps * 1000
 
     def _iter_func(self, pf: PaddleFrame):
@@ -694,7 +722,7 @@ class Video:
             self.old_frame = pf
             self.kfs.add(pf)
         else:
-            # @wait 具体的相似度算法可以参考策略模式, 将具体使用哪个相似度算法, 抽象成接口, 或者配置, 可以直接切换, 而不是这里写死
+            # @WAIT 具体的相似度算法可以参考策略模式, 将具体使用哪个相似度算法, 抽象成接口, 或者配置, 可以直接切换, 而不是这里写死
             ret, sim_score1 = pf.getSimScoreV4(self.old_frame)
             sim_score = 0
 
@@ -707,16 +735,17 @@ class Video:
             else:
                 sim_score = sim_score1
             # 还需要修复 关键点1 -> full, 再来一次 1-> full, 会导致重复的发生
-            # @performance 去重的操作如果影响性能, 可以提供用户点击去重效果
+            # @PERFORMANCE 去重的操作如果影响性能, 可以提供用户点击去重效果
             print(f"sim_score: {sim_score}")
-            # @wait 逆向相似度 > 正向相似度, 说明在减少内容, 是动画
+            # @WAIT 逆向相似度 > 正向相似度, 说明在减少内容, 是动画
 
             # 内容增加判断
             if sim_score > args.th_sim_score:  # 判断是否相似
                 # 增加内容的比较, 也要和 tail末尾的比较, 不过得相似的前提下
                 if pf.getBoxesLen() > self.old_frame.getBoxesLen():  # 内容增加
                     pf.ms = self.old_frame.ms
-                    pf.name = pf.name + f"%{self.old_frame.id}"
+                    pf.name = pf.name + \
+                        f"{args.frame_name_gap}{self.old_frame.id}"
                     if len(self.kfs) > 0:  # 如果关键帧列表不为空
                         self.kfs.updateTail(pf)
                     else:
@@ -801,7 +830,7 @@ class Chapter:
         self.id = id
         self.name = name
         self.course_id = course_id
-        self.videos = videos  # @wait 如何保证视频的有序性， 这样才能够保证搜索结果的有序性，（可以根据id排序，实现一次规整化处理）
+        self.videos = videos  # @WAIT 如何保证视频的有序性， 这样才能够保证搜索结果的有序性，（可以根据id排序，实现一次规整化处理）
 
     def __getitem__(self, index):
         return self.videos[index]
@@ -810,7 +839,7 @@ class Chapter:
         """
         :param key:
         :return: r[小节号][帧]
-        @wait 章节搜索内容的返回格式,   1: 不加区分, 直接list  2. dict格式: { chapter1: [内容] }
+        @WAIT 章节搜索内容的返回格式,   1: 不加区分, 直接list  2. dict格式: { chapter1: [内容] }
         3. {course: {
             chapter:
         }}
@@ -919,7 +948,7 @@ class Assember:
         course_id="",
     ) -> Chapter:
         # 获取章节目录下的所有视频的路径
-        # @risk 视频类型的过滤器可能有隐藏的bug
+        # @RISK 视频类型的过滤器可能有隐藏的bug
         video_paths = glob.glob(f"{chapter_path}\\*")
         video_paths = Assember.__filter_no_video_file(video_paths)
         chapter_name = chapter_name or os.path.basename(chapter_path)  # 获取目录名
@@ -1004,8 +1033,9 @@ class Assember:
         :param dir_path:
         :return:
         """
-        # @modify 为了可以找到图片的路径
-        dir_path = dir_path.replace(" ", "%").replace("\t", "%")
+        # @MODIFY 为了可以找到图片的路径
+        dir_path = dir_path.replace(" ", args.path_space_fill_char).replace(
+            "\t", args.path_space_fill_char)
         if not os.path.exists(dir_path):
             os.makedirs(dir_path, mode=0o777, exist_ok=True)
             # os.mkdir( dir_path )

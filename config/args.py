@@ -3,7 +3,7 @@
 speed_x = 1
 step = "fps"
 
-# @wait 去重相似度的阈值也需要独立成配置参数
+# @WAIT 去重相似度的阈值也需要独立成配置参数
 re_dul_nums = 1  # 去重的次数
 th_avg_score = 0.83  # 视频越清晰,越容易高分
 th_sim_score = 0.82  # 前后两帧相似度
@@ -32,7 +32,8 @@ img_format = "png"  # 图片保存的格式
 img_name_gap = "-"  # 1-1072%804.png | 1代表章节
 img_url_prefix = "http://127.0.0.1:5000"  # 第三方访问图片路径的域名? 本地图片存储的位置
 # video_format= ['mp4', 'flv', 'avi', 'wmv', 'mpg', 'mpeg'] # 其他格式还未测试
-
+path_space_fill_char = '_'   # 例如: 第六章 逻辑回归, 中间有空格, 浏览器无法打开
+frame_name_gap = '-'  # name: 123-66, 其中, 123代表当前帧的帧编号, 66该帧内容帧的位置,即该画面开始的位置
 # paddleOCR args
 cpu_threads = 100
 enable_mkldnn = True

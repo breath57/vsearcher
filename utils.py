@@ -1,6 +1,6 @@
+from pathlib import Path
 import time
 from typing import List
-from unicodedata import name
 import img2pdf
 import json
 import pickle
@@ -8,13 +8,15 @@ import shutil
 import cv2 as cv
 import numpy as np
 from vsearch.config import path
+from vsearch.video import Chapter, Video
 from .config import args
 import os
 
 
 def saveObject(out_path, o, name=''):
     name = name or o.name
-    name = name.replace(' ', '%').replace('\t', '%')
+    name = name.replace(' ', args.path_space_fill_char).replace(
+        '\t', args.path_space_fill_char)
     if not os.path.exists(out_path):
         os.makedirs(out_path, mode=0o777, exist_ok=True)
     output_hal = open(f'{out_path}\\{name}.pkl', 'wb')
@@ -28,6 +30,18 @@ def readObject(input_path, name):
     input_path = os.path.join(input_path, name) + '.pkl'
     with open(input_path, 'rb') as file:
         return pickle.loads(file.read())
+
+
+def readVideoObject(name) -> Video:
+    return readObject(path.RootPath.output_video_object_dir, name)
+
+
+def readChapterObject(name) -> Chapter:
+    return readObject(path.RootPath.output_chapter_object_dir, name)
+
+
+def readCourseObject(name) -> Chapter:
+    return readObject(path.RootPath.output_course_object_dir, name)
 
 
 def cvimread(path):
@@ -71,6 +85,9 @@ def json_loads(json_str):
 
 
 def msToH_M_S_str(ms):
+    """
+
+    """
     print(f'ms: {ms}')
     s = ms//1000
     ss = str(int(s % 60))
@@ -94,22 +111,27 @@ def local2url(local_path):
     """
     url = local_path.replace(
         path.RootPath.project_root_dir, args.img_url_prefix)
-    print(
-        f'project_root_dir: {path.RootPath.project_root_dir} img_url_prefix: {args.img_url_prefix}  ')
+    # print(
+    #     f'project_root_dir: {path.RootPath.project_root_dir} img_url_prefix: {args.img_url_prefix}  ')
     return url.replace('\\', '/')
+
+
+def unify_path(path):
+    """ 统一全局的路径分隔符号为本地兼容的 "\\" """
+    return str(Path(path))
 
 
 def url2local(url):
     """
-        http://服务器域名/xxx -> http://127.0.0.1/xxx
+        http://服务器域名/xxx -> F://a/bc/d
     """
-    # @wait 是否有必要兼容win 还是全局 统一/
+    # @WAIT 是否有必要兼容win 还是全局 统一/
     local_path = url.replace(
         args.img_url_prefix, path.RootPath.project_root_dir)
-    return local_path.replace('/', '\\')
+    return unify_path(local_path)
 
 
-# @wait
+# @WAIT
 def copy_video_by_img_local_path(video_local_path, img_local_path, file_name='v'):
     """
     将视频在电脑的位置，拷贝到img_url对应在本地的文件夹中的位置，
@@ -117,14 +139,14 @@ def copy_video_by_img_local_path(video_local_path, img_local_path, file_name='v'
     """
     # __drive_unified(video_local_path)
     # __drive_unified(img_local_path)
-    video_format = os.path.basename(video_local_path).split('.')[-1]
+    video_format = Path.suffix(video_local_path)
     # local_img_path = url2local(img_local_path)
     # img_local_path  /12321.png
     dest = img_local_path.replace(
-        # @risking 如果路径中含有 / 怎么办, 因此应该自定义一个获取文件路径的方法, 兼容问题
-        # @modify
+        # @RISKing 如果路径中含有 / 怎么办, 因此应该自定义一个获取文件路径的方法, 兼容问题
+        # @MODIFY
         # img_local_path.split('\\')[-1]
-        os.path.basename(img_local_path), f'{file_name}.{video_format}')
+        os.path.basename(img_local_path), f'{file_name}{video_format}')
     if not os.path.exists(dest):
         shutil.copy(video_local_path, dest)
     print(f'dest: {dest}')
@@ -139,12 +161,12 @@ def copy_video_by_img_local_path(video_local_path, img_local_path, file_name='v'
 
 def glob_sort(paths, regex='(\d+)'):
     """
-    # 由于glob出来的路径, 是乱序的, 因此根据个人设定的文件名, 按照读取到的视频帧排序
-    # 例如: '-6625%6600.png' => 6625    '-6625.png' => 6625  '6625.png' => 6625
+    由于glob出来的路径, 是乱序的, 因此根据个人设定的文件名, 按照读取到的视频帧排序
+    例如: '-6625%6600.png' => 6625    '-6625.png' => 6625  '6625.png' => 6625
     """
 
     import re
-    # @modify file_path -> os.path.basename(file_name)
+    # @MODIFY file_path -> os.path.basename(file_name)
     return sorted(paths,  key=lambda file_path: int(re.findall(regex, os.path.basename(file_path))[0]))
 
 
@@ -163,10 +185,11 @@ def get_unique_str() -> str:
     return str(int(time.time()))
 
 
-def img2pdf(sorted_paths: List[str], output_dir=None, file_name='temp') -> str:
+def imgs2pdf(sorted_paths: List[str], output_dir=None, file_name='temp') -> str:
     """
+        @MODIFY img2pdf是一个库, 函数不能重名 所以改为 imgs2pdf
         如果不传入输出目录, 则直接生成在图片的目录下, 并且返回pdf文件的本地路径
-
+        @Notice 如果文件已经存在则直接使用, 不会重新生成和覆盖, @RISK 新的视频和旧的视频重名了, @SOLUTION 所以可以考虑为每个视频生成md5(指纹), 就可以避免已经存在的文件, 重新加载
         return:
             if file_name = 'temp' then {name}_{get_unique_str()}.pdf
     """
@@ -176,15 +199,18 @@ def img2pdf(sorted_paths: List[str], output_dir=None, file_name='temp') -> str:
         """
             Example: D:/t\\a/b.cn
         """
-        output_dir = os.path.dirname()
+        output_dir = os.path.dirname(sorted_paths[0])
     # img_file = "myImg.jpg"  # 图片路径
 
-    pdf_file_path = f'{output_dir}/{name}_{get_unique_str()}.pdf' if file_name is 'temp' else f'{output_dir}/{name}.pdf'
-
+    pdf_file_path = unify_path(
+        f'{output_dir}/{file_name}_{get_unique_str()}.pdf' if file_name is 'temp' else f'{output_dir}/{file_name}.pdf')
     # 创建一个PDF文件 并以二进制方式写入
-    with open(pdf_file_path, "wb") as f:
-        # convert函数 用来转PDF
-        write_content = img2pdf.convert(sorted_paths)
-        f.write(write_content)  # 写入文件
-    print(f"pdf生成成功: {pdf_file_path}")  # 提示语
+    print(f'pdf_file_path: {pdf_file_path}')
+    print(Path(pdf_file_path).exists())
+    if not Path(pdf_file_path).exists():
+        with open(pdf_file_path, "wb") as f:
+            # convert函数 用来转PDF
+            write_content = img2pdf.convert(sorted_paths)
+            f.write(write_content)  # 写入文件
+        print(f"pdf生成成功: {pdf_file_path}")  # 提示语
     return pdf_file_path
