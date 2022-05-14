@@ -1,9 +1,20 @@
+import pandas as pd
+import warnings
+# from functools import cached_property
+from werkzeug.utils import cached_property
 import jieba
 import numpy as np
 from collections import Counter
 
 #  字符串还是文本列表, 或者OCR已经算分词了吗
 # 该版本 输入: 为list  或者 str都可以
+
+from .config import path
+from .config import args
+
+f_path = f'{path.RootPath.step_word_path}\\{args.stop_word_file}'
+result = pd.read_csv(f_path, sep='\n\r', names=['word'], encoding='gbk')
+stop_word_set = set(result['word'].values)
 
 
 class TextSimilarity(object):
@@ -96,7 +107,7 @@ class TextSimilarity(object):
                    TextSimilarity.getSimScoreV1(str_pre, str_next))
 
     @staticmethod
-    def getSimScoreV3(str_pre, str_next) -> dict:
+    def getSimScoreV3(str_pre, str_next, filter_stop_word=False) -> dict:
         """
         双向相似度
         计算前一个字符集合, 在后一个字符集合出现的比重
@@ -107,7 +118,10 @@ class TextSimilarity(object):
         }
         """
         ""
-        sp, sn = set(str_pre), set(str_next)
+        sp, sn = set( str_pre ) , set( str_next )
+        if filter_stop_word:
+            sp, sn = sp - stop_word_set, sn - stop_word_set
+        print(f'sp: {sp} \nsn: {sn}')
         IN = sp & sn
         base_pre_sim, base_nt_sim = 0, 0
         if len(IN) != 0:
@@ -119,20 +133,216 @@ class TextSimilarity(object):
         }
 
     @staticmethod
+    def getSimScoreV3_pure(str_pre, str_next) -> dict:
+        """
+        双向相似度
+        计算前一个字符集合, 在后一个字符集合出现的比重
+        返回值 0~1, 1代表str_pre是str_next字符的重复率很高
+        @return {
+            'base_pre': base_pre_sim,
+            'base_nt': base_nt_sim
+        }
+        """
+        ""
+        sp, sn = set(str_pre), set(str_next)
+        # print(f'sp: {sp} \nsn: {sn}')
+        IN = sp & sn
+        base_pre_sim, base_nt_sim = 0, 0
+        if len(IN) != 0:
+            base_pre_sim = len(IN)/len(sp)
+            base_nt_sim = len(IN)/len(sn)
+        return {
+            'base_pre': base_pre_sim,
+            'base_nt': base_nt_sim
+        }
+
+    @staticmethod
+    def getSimScoreV3_1(str_pre, str_next, gap_str=None):
+        """
+            @WAIT 或许可以兼容英文的内容
+            @WAIT 更加高级的做法, 应该是加入TF-IDF选词功能
+            @WAIT 一定的容错率是允许的
+        """
+        if gap_str is not None:
+            print('分词后, 去掉该符号, 也就是set中')
+        sp, sn = set(jieba.lcut(str_pre)), set(jieba.lcut(str_next))
+        # 需要去停用词, str_pre最好用分隔符号进行切割
+        IN = sp & sn
+        base_pre_sim, base_nt_sim = 0, 0
+        if len(IN) != 0:
+            base_pre_sim = len(IN) / len(sp)
+            base_nt_sim = len(IN) / len(sn)
+        return {
+            'base_pre': base_pre_sim,
+            'base_nt': base_nt_sim
+        }
+
+    @staticmethod
+    def getSimScoreV3_2(str_pre, str_next):
+        """
+            @WAIT 或许可以兼容英文的内容
+            @WAIT 更加高级的做法, 应该是加入TF-IDF选词功能
+            @WAIT 一定的容错率是允许的
+        """
+        sw_set = stop_word_set
+        # 需要去停用词, str_pre最好用分隔符号进行切割
+        sp, sn = (set(jieba.lcut(str_pre)) -
+                  sw_set), (set(jieba.lcut(str_next)) - sw_set)
+        print(f'sw_set: {sw_set}')
+        print(f'sp: {sp} \nsn: {sn}')
+        IN = sp & sn
+        base_pre_sim, base_nt_sim = 0, 0
+        if len(IN) != 0:
+            base_pre_sim = len(IN) / len(sp)
+            base_nt_sim = len(IN) / len(sn)
+
+        return {
+            'base_pre': base_pre_sim,
+            'base_nt': base_nt_sim
+        }
+
+    @staticmethod
+    def getSimScoreV3_2_pure(str_pre, str_next):
+        """
+            @WAIT 或许可以兼容英文的内容
+            @WAIT 更加高级的做法, 应该是加入TF-IDF选词功能
+            @WAIT 一定的容错率是允许的
+        """
+        sw_set = stop_word_set
+        # 需要去停用词, str_pre最好用分隔符号进行切割
+        sp, sn = (set(jieba.lcut(str_pre)) -
+                  sw_set), (set(jieba.lcut(str_next)) - sw_set)
+        # print(f'sp: {sp} \nsn: {sn}')
+        IN = sp & sn
+        base_pre_sim, base_nt_sim = 0, 0
+        if len(IN) != 0:
+            base_pre_sim = len(IN) / len(sp)
+            base_nt_sim = len(IN) / len(sn)
+
+        return {
+            'base_pre': base_pre_sim,
+            'base_nt': base_nt_sim
+        }
+
+    @staticmethod
     def getSimScoreV4(str_pre, str_next) -> dict:
+        print(f'str_pre: {str_pre}  \nstr_next: {str_next}')
         """
         @return ret, sim
         返回双向相似度最大值, 并返回 两个方向相似度的大小关系
+        越大内容越少
+        0: 相同 |  1：(后面内容多)前比后大 | -1： （前面内容多）后比前大
         """
-        score = TextSimilarity.getSimScoreV3(str_pre, str_next)
+        score = TextSimilarity.getSimScoreV3(str_pre, str_next,filter_stop_word=True)
+        base_pre = score['base_pre']
+        base_nt = score['base_nt']
+        print(f'base_pre: {base_pre} | base_nt: {base_nt}')
+        print(base_nt == base_pre)
+        sim = max(base_pre, base_nt)
+        ret = 0
+        if base_nt == base_pre:
+            ret = 0
+        elif base_pre > base_nt:
+            ret = 1
+        else:
+            ret = -1
+        return ret, sim
+
+    @staticmethod
+    def getSimScoreV4_pure(str_pre, str_next) -> dict:
+        # print( f'str_pre: {str_pre}  \nstr_next: {str_next}' )
+        """
+        @return ret, sim
+        返回双向相似度最大值, 并返回 两个方向相似度的大小关系
+        越大内容越少
+        0: 相同 |  1：(后面内容多)前比后大 | -1： （前面内容多）后比前大
+        """
+        score = TextSimilarity.getSimScoreV3_pure( str_pre, str_next )
+        base_pre = score['base_pre']
+        base_nt = score['base_nt']
+        # print( f'base_pre: {base_pre} | base_nt: {base_nt}' )
+        sim = max( base_pre, base_nt )
+        ret = 0
+        if base_nt == base_pre:
+            ret = 0
+        elif base_pre > base_nt:
+            ret = 1
+        else:
+            ret = -1
+        return ret, sim
+
+    @staticmethod
+    def getSimScoreV4_1(str_pre, str_next) -> dict:
+        """
+        @return ret, sim
+        返回双向相似度最大值, 并返回 两个方向相似度的大小关系
+        0: 相同  1：前比后大 -1： 后比前大
+        """
+
+        score = TextSimilarity.getSimScoreV3_1(str_pre, str_next)
         base_pre = score['base_pre']
         base_nt = score['base_nt']
         sim = max(base_pre, base_nt)
         ret = 0
         if base_nt == base_pre:
             ret = 0
-        if base_pre > base_nt:
+        elif base_pre > base_nt:
             ret = 1
         else:
             ret = -1
         return ret, sim
+
+    @staticmethod
+    def getSimScoreV4_2(str_pre: str, str_next: str) -> dict:
+
+        print(f'str_pre: {str_pre}  \nstr_next: {str_next}')
+        score = TextSimilarity.getSimScoreV3_2(str_pre, str_next)
+        base_pre = score['base_pre']
+        base_nt = score['base_nt']
+        print(f'base_pre: {base_pre} | base_nt: {base_nt}')
+        max_sim = max(base_pre, base_nt)
+        min_sim = min(base_pre, base_nt)
+        sim = max_sim
+        # if min_sim < 0.2:
+        #     sim = args.th_sim_score - 0.1
+        # @WAIT 对应框框位置的误差阈值， 来判断相似 -》 先内容 -》 位置 （位置差别大， 直接没有相似度？）
+        ret = 0
+        if base_nt == base_pre:
+            ret = 0
+        elif base_pre > base_nt:
+            ret = 1
+        else:
+            ret = -1
+        return ret, sim
+
+    @staticmethod
+    def getSimScoreV4_2_pure(str_pre: str, str_next: str) -> dict:
+
+        # print(f'str_pre: {str_pre}  \nstr_next: {str_next}')
+        # score = TextSimilarity.getSimScoreV3_2_pure(str_pre, str_next)
+        score = TextSimilarity.getSimScoreV3_2_pure(str_pre.casefold(), str_next.casefold())
+        base_pre = score['base_pre']
+        base_nt = score['base_nt']
+        print(f'base_pre: {base_pre} | base_nt: {base_nt}')
+        max_sim = max(base_pre, base_nt)
+        min_sim = min(base_pre, base_nt)
+        sim = max_sim
+        # if min_sim < 0.2:
+        #     sim = args.th_sim_score - 0.1
+        # @WAIT 对应框框位置的误差阈值， 来判断相似 -》 先内容 -》 位置 （位置差别大， 直接没有相似度？）
+        ret = 0
+        if base_nt == base_pre:
+            ret = 0
+        elif base_pre > base_nt:
+            ret = 1
+        else:
+            ret = -1
+        return ret, sim
+
+    @staticmethod
+    def getSimScore(str_pre: str, str_next: str) -> tuple:
+        return TextSimilarity.getSimScoreV4(str_pre, str_next)
+    @staticmethod
+    def box_sim(pre_boxes, next_boxes):
+        """ 待定 """
+        warnings.warn("box sim don't use!", DeprecationWarning)

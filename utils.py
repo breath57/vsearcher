@@ -7,8 +7,9 @@ import pickle
 import shutil
 import cv2 as cv
 import numpy as np
-from vsearch.config import path
+
 from vsearch.video import Chapter, Video
+from .config import path
 from .config import args
 import os
 
@@ -110,7 +111,7 @@ def local2url(local_path):
         http://127.0.0.1/xxx -> http://服务器域名/xxx
     """
     url = local_path.replace(
-        path.RootPath.project_root_dir, args.img_url_prefix)
+        path.RootPath.project_root_dir, args.url_prefix)
     # print(
     #     f'project_root_dir: {path.RootPath.project_root_dir} img_url_prefix: {args.img_url_prefix}  ')
     return url.replace('\\', '/')
@@ -127,7 +128,7 @@ def url2local(url):
     """
     # @WAIT 是否有必要兼容win 还是全局 统一/
     local_path = url.replace(
-        args.img_url_prefix, path.RootPath.project_root_dir)
+        args.url_prefix, path.RootPath.project_root_dir)
     return unify_path(local_path)
 
 
@@ -214,3 +215,10 @@ def imgs2pdf(sorted_paths: List[str], output_dir=None, file_name='temp') -> str:
             f.write(write_content)  # 写入文件
         print(f"pdf生成成功: {pdf_file_path}")  # 提示语
     return pdf_file_path
+
+
+def calculate_runtime(func, *args, **kwargs):
+    start_time = time.time()
+    func(*args, **kwargs)
+    end_time = time.time()
+    print(f'运行时间: {end_time - start_time}')

@@ -1,5 +1,7 @@
 
 # ['__builtins__', '__cached__', '__doc__', '__file__', '__loader__', '__name__', '__package__', '__spec__']
+import glob
+from .args import paddle_dir_name
 
 def getProjectRootPath():
     r = __name__.replace('.', '\\')
@@ -13,6 +15,14 @@ def getThisPackageRootPath():
     i = r.index('config')
     return getProjectRootPath() + "\\" + r[:i-1]
 
+
+# 路径生成辅助函数
+
+def load_ocr_path(model_dir, paddle_name):
+    ''' 用于生成ocr路径 '''
+    det_path = glob.glob(f'{model_dir}\\ocr\\{paddle_name}\\*det*')[0]
+    rec_path = glob.glob(f'{model_dir}\\ocr\\{paddle_name}\\*rec*')[0]
+    return det_path, rec_path
 
 class RootPath:
     # 当前项目的根路径
@@ -40,19 +50,28 @@ class RootPath:
     output_chapters_dir = output_dir + "\\chapters"
     output_videos_dir = output_dir + "\\videos"
 
+    # 外部资源 resource 根目录
+    _resource_dir = f'{vsearch_root_dir}\\resource'
+
     # 导入训练好的机器学习模型路径
-    _model_dir = f'{vsearch_root_dir}\\model'
+    _model_dir = f'{_resource_dir}\\model'
+
+
+
 
     # paddleocr 文字检测 和 文字分类模型 | 最新版可以自行去git的paddleocr查看, 将此处的路径末尾改名字即可自动下载
-    det_model_dir = f'{_model_dir}\\ocr\\paddle\\ch_ppocr_mobile_v2.0_det_infer'
-    rec_model_dir = f'{_model_dir}\\ocr\\paddle\\ch_ppocr_mobile_v2.0_rec_infer'
+    det_model_dir, rec_model_dir = load_ocr_path(_model_dir, paddle_dir_name)
 
 
-for k in RootPath.__dict__.keys():
-    # new_temp = list(RootPath.__dict__[k])
-    # new_temp[0] = new_temp[0].upper()
-    print(k)
-    # RootPath.__dict__[k] = ''.join(new_temp)
+    # 停用词的目录
+    step_word_path = f'{_resource_dir}\\step_word'
+
+
+# for k in RootPath.__dict__.keys():
+#     # new_temp = list(RootPath.__dict__[k])
+#     # new_temp[0] = new_temp[0].upper()
+#     print(k)
+#     # RootPath.__dict__[k] = ''.join(new_temp)
 
 print(f'最开始 RootPath.output_videos_dir: {RootPath.output_videos_dir}')
-print(RootPath.__dict__)
+# print(RootPath.__dict__)

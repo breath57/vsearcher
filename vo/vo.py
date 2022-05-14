@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from paddleocr import draw_ocr
 
 
 @dataclass
