@@ -21,7 +21,7 @@ from .config.path import RootPath
 from .vo import vo
 from vsearch.config import path
 
-if args.use_gpu:
+if args.Performance.use_gpu:
     print( '启用GPU............' )
     import paddle
 
@@ -29,8 +29,8 @@ if args.use_gpu:
 
     # @RISK 判断设备是否存在 再设置
     if paddle.get_device() != 'cpu':
-        paddle.set_device( args.gpu_name )
-    print( f'current use device: {args.gpu_name}' )
+        paddle.set_device( args.Performance.gpu_name )
+    print( f'current use device: {args.Performance.gpu_name}' )
 # paddle.set_device('gpu:0')
 
 """
@@ -174,11 +174,11 @@ class ThreadManager:
             推荐设置: 不设置, 使用系统自动设置
         '''
         if max_workers is None:
-            max_workers = None if args.th_process_nums is 'auto' else args.th_process_nums
+            max_workers = None if args.Performance.th_process_nums is 'auto' else args.Performance.th_process_nums
         # @RISK 线程和进程的上限是多少合适, 好像系统会自动弄
 
         if mode is None:
-            mode = args.process_mode
+            mode = args.Performance.process_mode
 
         if mode == 'thread':
             return futures.ThreadPoolExecutor( max_workers=max_workers )
@@ -193,7 +193,7 @@ class OCR:
     paddle_ocr_init_args = {
         "det_model_dir": RootPath.det_model_dir,
         "rec_model_dir": RootPath.rec_model_dir,
-        "cpu_threads": args.cpu_threads,
+        "cpu_threads": args.Performance.cpu_threads,
         "enable_mkldnn": args.enable_mkldnn,
         "det_db_box_thresh": args.det_db_box_thresh,
         "det_db_unclip_ratio": args.det_db_unclip_ratio,
@@ -204,7 +204,7 @@ class OCR:
         可以根据情况动态增加线程
     '''
 
-    def __init__(self, ocr_num=args.ocr_num, ocr_load=args.ocr_load):
+    def __init__(self, ocr_num=args.Performance.ocr_num, ocr_load=args.Performance.ocr_load):
         '''
         ocr_num: 创建的OCR对象的个数
         ocr_load: 每个OCR对象, 同时处理的线程的最大数量
@@ -817,7 +817,8 @@ class Video:
         #     self._run()
 
     def _getPoolsExecutor(self):
-        return ThreadManager.getPoolsExecutor()
+        return ThreadManager.getPoolsExecutor( mode=args.Performance.video_process_mode,
+                                               max_workers=args.Performance.th_video_multiple_nums )
 
     def _fastProcess(self, func, args) -> list:
         with self._getPoolsExecutor() as executor:
@@ -830,9 +831,9 @@ class Video:
         '''
         self.process_frame_sum_counts = self.frame_counts // self.step  # 一个视频需要处理的视频帧
 
-        self.section_nums = self.thread_nums = self.process_frame_sum_counts // args.th_mul_thread_on_frame_counts  # 区间大小， 每个线程处理的任务量
+        self.section_nums = self.thread_nums = self.process_frame_sum_counts // args.Performance.th_mul_thread_on_frame_counts  # 区间大小， 每个线程处理的任务量
 
-        self.gap = args.th_mul_thread_on_frame_counts * self.step
+        self.gap = args.Performance.th_mul_thread_on_frame_counts * self.step
         if self.section_nums == 0:
             self.thread_nums = self.section_nums = 1  # 代表使用多线程
         print( f'v: {self.name} 需要遍历的帧为： {self.process_frame_sum_counts}' )
@@ -1388,12 +1389,13 @@ class Assember:
         output_dir = output_dir + "\\" + dir_name
         # @modified 修改了路径
         output_dir = Assember._setDir( output_dir )
-        with ThreadManager.getPoolsExecutor() as executor:
-            chapters = list( executor.map( lambda i, dir_path: Assember.executeChapter(
-                chapter_path=dir_path,
+        with ThreadManager.getPoolsExecutor( mode=args.Performance.course_process_mode,
+                                             max_workers=args.Performance.th_course_multiple_nums ) as executor:
+            chapters = list( executor.map( lambda arg: Assember.executeChapter(
+                chapter_path=arg[1],
                 output_dir=output_dir,
-                chapter_id=i + 1,
-                chapter_name=os.path.basename( dir_path ),
+                chapter_id=arg[0] + 1,
+                chapter_name=os.path.basename( arg[1] ),
                 course_id=course_id,
             ), enumerate( chapter_dirs ) ) )
             # chapters = [
@@ -1425,7 +1427,8 @@ class Assember:
         # @modified 修改了路径
         output_dir = Assember._setDir( output_dir )
 
-        with ThreadManager.getPoolsExecutor() as executor:
+        with ThreadManager.getPoolsExecutor( mode=args.Performance.chapter_process_mode,
+                                             max_workers=args.Performance.th_chapter_multiple_nums ) as executor:
             videos = list(
                 executor.map( lambda arg: Assember.executeVideo(
                     video_path=arg[1],

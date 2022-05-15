@@ -1,4 +1,4 @@
-# 已经做了内存优化, 支持大视频
+# 已经做了内存优化, 支持大视频 # 对的
 # 该功能还没有引入
 th_min_boxsize = 2 # 设置最小文本框的大小， 可以过滤掉代码， 可以提升解析速度
 
@@ -19,6 +19,8 @@ th_min_boxsize = 2 # 设置最小文本框的大小， 可以过滤掉代码， 
 
 # 目录 切分， 分治 多线程, 异步处理
 ```py
+from threading import Thread
+from time import sleep
 tasks = []
 win_size = 5
 while True:
@@ -32,8 +34,6 @@ while True:
             break
         else:
             sleep(100)
-    
-
 ```
 
 队列
@@ -53,4 +53,11 @@ while True:
 
 加载模式， 先大范围跳跃PPT， 有课件帧加入之后，再减缓搜索的速度
 
-# 视频的拷贝 属于懒加载
+# 视频的拷贝 属于懒加载, 确实如此 边播放, 边加载
+
+@RISK 多进程还没有进行测试
+@RISK　课程的内容的提取还没有测试
+
+@RISK 不支持不线程版本的课件BUG还没有修复
+
+flask 版本的测试

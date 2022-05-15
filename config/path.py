@@ -1,7 +1,7 @@
 
 # ['__builtins__', '__cached__', '__doc__', '__file__', '__loader__', '__name__', '__package__', '__spec__']
 import glob
-from .args import paddle_dir_name
+from .args import Performance as performance_config
 
 def getProjectRootPath():
     r = __name__.replace('.', '\\')
@@ -60,7 +60,7 @@ class RootPath:
 
 
     # paddleocr 文字检测 和 文字分类模型 | 最新版可以自行去git的paddleocr查看, 将此处的路径末尾改名字即可自动下载
-    det_model_dir, rec_model_dir = load_ocr_path(_model_dir, paddle_dir_name)
+    det_model_dir, rec_model_dir = load_ocr_path(_model_dir, performance_config.paddle_dir_name)
 
 
     # 停用词的目录
