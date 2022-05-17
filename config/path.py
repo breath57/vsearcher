@@ -8,6 +8,9 @@ def getProjectRootPath():
     i = __file__.index(r)
     return __file__[: i-1]
 
+print('-----------------------------------')
+print(f'项目根目录: {getProjectRootPath()}')
+print('-----------------------------------')
 
 def getThisPackageRootPath():
     r = __name__.replace('.', '\\')
@@ -73,5 +76,5 @@ class RootPath:
 #     print(k)
 #     # RootPath.__dict__[k] = ''.join(new_temp)
 
-print(f'最开始 RootPath.output_videos_dir: {RootPath.output_videos_dir}')
+# print(f'最开始 RootPath.output_videos_dir: {RootPath.output_videos_dir}')
 # print(RootPath.__dict__)

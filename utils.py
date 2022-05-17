@@ -8,7 +8,7 @@ import shutil
 import cv2 as cv
 import numpy as np
 
-from vsearch.video import Chapter, Video
+from .video import Chapter, Video
 from .config import path
 from .config import args
 import os
@@ -29,6 +29,9 @@ def saveObject(out_path, o, name=''):
 
 def readObject(input_path, name):
     input_path = os.path.join(input_path, name) + '.pkl'
+    if not os.path.exists(input_path):
+        print(f'path: {input_path} 不存在! ')
+        return None
     with open(input_path, 'rb') as file:
         return pickle.loads(file.read())
 
@@ -89,7 +92,7 @@ def msToH_M_S_str(ms):
     """
 
     """
-    print(f'ms: {ms}')
+    # print(f'ms: {ms}')
     s = ms//1000
     ss = str(int(s % 60))
     if len(ss) == 1:
@@ -102,7 +105,7 @@ def msToH_M_S_str(ms):
     if len(h) == 1:
         h = '0' + h
     time = f'{h}:{mm}:{ss}'
-    print(f'time: {time}')
+    # print(f'time: {time}')
     return time
 
 

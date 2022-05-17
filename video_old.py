@@ -1,12 +1,10 @@
 from pathlib import Path
 import time
 from typing import List
-from unittest import result
 import filetype
 import shutil
 import copy as cp
 import glob
-import os
 import cv2 as cv
 import numpy as np
 from paddleocr import PaddleOCR, draw_ocr
@@ -15,12 +13,11 @@ import os
 from prometheus_client import Enum
 # import paddle
 
-from . import utils
+from . import utils, vo
 from .config import args
 from .sim_v1 import TextSimilarity
 from .config.path import RootPath
 
-from .vo import vo
 from vsearch.config import path
 
 if args.use_gpu:
@@ -900,7 +897,7 @@ class Course:
             # else:
             if not chapter_vo.isEmpty():
                 chapters.append(chapter_vo)
-        result = vo.Course(id=self.id, chapters=chapters, name=self.name)
+        result = vo.Course( id=self.id, chapters=chapters, name=self.name )
         return utils.json_dumps(result) if json_dumps else result
 
 

@@ -2,13 +2,10 @@ from concurrent import futures
 from pathlib import Path
 import time
 from typing import List
-from unittest import result
 import warnings
 import filetype
 import shutil
-import copy as cp
 import glob
-import os
 import cv2 as cv
 import numpy as np
 from paddleocr import PaddleOCR, draw_ocr
@@ -17,12 +14,11 @@ import os
 from prometheus_client import Enum
 # import paddle
 
-from . import utils
+from . import utils, vo
 from .config import args
 from .sim_v1 import TextSimilarity
 from .config.path import RootPath
 
-from .vo import vo
 from vsearch.config import path
 
 if args.use_gpu:
@@ -246,7 +242,7 @@ class PaddleFrame:
         if self.id != self.start_id:
             name = f"{name}{args.frame_name_gap}{self.start_id}"
         if self.section_id is not None:
-            name = f'{self.section_id}#{name}'
+            name = f'{self.section_id}{args.img_name_gap}{name}'
         return name
 
     def __is_into_iter(self):
@@ -588,7 +584,7 @@ class KeyFrames:
         pre_pf = frame_list[0]
         while i < self._len():  # i还在范围内容
             next_pf = frame_list[i]
-            ret, sim = pre_pf._getSimScoreV4( next_pf )
+            ret, sim = pre_pf._getSimScoreV4(next_pf)
             if sim < args.th_sim_score:
                 pre_pf = next_pf
                 i += 1
@@ -1180,7 +1176,7 @@ class Course:
             # else:
             if not chapter_vo.isEmpty():
                 chapters.append(chapter_vo)
-        result = vo.Course(id=self.id, chapters=chapters, name=self.name)
+        result = vo.Course( id=self.id, chapters=chapters, name=self.name )
         return utils.json_dumps(result) if json_dumps else result
 
 
