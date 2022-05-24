@@ -1,4 +1,4 @@
-speed_x = 1
+speed_x = 20
 step = "fps"
 # 用线程和进程安全的数据结构, 对OCR的创建进行控制
 
@@ -70,6 +70,7 @@ th_max_codeline_num = 7  # 最大代码框的数量, 大于该值判断为代码
 
 img_format = "png"  # 图片保存的格式
 img_name_gap = "-"  # 1-1072%804.png | 1代表章节
+file_name_gap = '_'
 url_prefix = "http://127.0.0.1:5000"  # 第三方访问图片路径的域名? 本地图片存储的位置
 # url_prefix = "https://389852tw96.oicp.vip"  # 第三方访问图片路径的域名? 本地图片存储的位置
 # video_format= ['mp4', 'flv', 'avi', 'wmv', 'mpg', 'mpeg'] # 其他格式还未测试

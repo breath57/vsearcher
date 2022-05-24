@@ -125,6 +125,14 @@ def unify_path(path):
     return str(Path(path))
 
 
+def unify_file_name(file_name:str):
+    """ 替换无意义的[' ', '#'] 等符号，这些符号会导致url访问出问题 , 例如： ‘#’ 在url中会处理为路径 """
+    if file_name:
+        return file_name.replace(' ', args.file_name_gap).replace('#', args.file_name_gap)
+    else:
+        # @WAIT 全局统一异常处理
+        raise RuntimeError('请输入正确的视频名称')
+
 def url2local(url):
     """
         http://服务器域名/xxx -> F://a/bc/d

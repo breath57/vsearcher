@@ -201,6 +201,7 @@ class Searcher:
             功能: 根据搜索关键字返回各种各样的搜索结果
             @param: json_dumps  是否进行对搜索结果进行json序列化
         """
+        name = utils.unify_file_name(name)
         # 重置搜索时间
         cls.__reset_time_stamp()
         o = None
