@@ -9,15 +9,13 @@ import cv2 as cv
 import numpy as np
 
 from .video import Chapter, Video
-from .config import path
-from .config import args
+from ..config import path
+from ..config import args
 import os
 
 
 def saveObject(out_path, o, name=''):
     name = name or o.name
-    name = name.replace(' ', args.path_space_fill_char).replace(
-        '\t', args.path_space_fill_char)
     if not os.path.exists(out_path):
         os.makedirs(out_path, mode=0o777, exist_ok=True)
     output_hal = open(f'{out_path}\\{name}.pkl', 'wb')
@@ -109,38 +107,28 @@ def msToH_M_S_str(ms):
     return time
 
 
+from urllib import parse
+
 def local2url(local_path):
     """
         http://127.0.0.1/xxx -> http://服务器域名/xxx
     """
-    url = local_path.replace(
-        path.RootPath.project_root_dir, args.url_prefix)
+    source_path = local_path.replace(
+        path.RootPath.project_root_dir, '').replace('\\', '/')
+    url = f'{args.url_prefix}{parse.quote(source_path)}'
     # print(
     #     f'project_root_dir: {path.RootPath.project_root_dir} img_url_prefix: {args.img_url_prefix}  ')
-    return url.replace('\\', '/')
-
-
-def unify_path(path):
-    """ 统一全局的路径分隔符号为本地兼容的 "\\" """
-    return str(Path(path))
-
-
-def unify_file_name(file_name:str):
-    """ 替换无意义的[' ', '#'] 等符号，这些符号会导致url访问出问题 , 例如： ‘#’ 在url中会处理为路径 """
-    if file_name:
-        return file_name.replace(' ', args.file_name_gap).replace('#', args.file_name_gap)
-    else:
-        # @WAIT 全局统一异常处理
-        raise RuntimeError('请输入正确的视频名称')
+    return url # @MODIFY 为了应对本地路径中含有空白字符和转义字符, 导致url路径不正确
 
 def url2local(url):
     """
         http://服务器域名/xxx -> F://a/bc/d
     """
+    url = parse.unquote(url) # @MODIFY 为了应对url路径中含有空白字符和转义字符
     # @WAIT 是否有必要兼容win 还是全局 统一/
     local_path = url.replace(
         args.url_prefix, path.RootPath.project_root_dir)
-    return unify_path(local_path)
+    return local_path
 
 
 # @WAIT
@@ -214,8 +202,7 @@ def imgs2pdf(sorted_paths: List[str], output_dir=None, file_name='temp') -> str:
         output_dir = os.path.dirname(sorted_paths[0])
     # img_file = "myImg.jpg"  # 图片路径
 
-    pdf_file_path = unify_path(
-        f'{output_dir}/{file_name}_{get_unique_str()}.pdf' if file_name is 'temp' else f'{output_dir}/{file_name}.pdf')
+    pdf_file_path = f'{output_dir}/{file_name}_{get_unique_str()}.pdf' if file_name == 'temp' else f'{output_dir}/{file_name}.pdf'
     # 创建一个PDF文件 并以二进制方式写入
     print(f'pdf_file_path: {pdf_file_path}')
     print(Path(pdf_file_path).exists())

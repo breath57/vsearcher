@@ -1,7 +1,7 @@
 
 
 import cv2 as cv
-from .video import PaddleFrame
+from ..core.video import PaddleFrame
 import sys
 sys.path.append('../')
 # 你么

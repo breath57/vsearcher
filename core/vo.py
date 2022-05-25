@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-import vsearch.utils as utils
+from . import  utils
 
 @dataclass
 class Base:
@@ -30,9 +30,9 @@ class Frame:
 
     @staticmethod
     def create(pf):
-        return Frame(id=pf.id, name=pf.get_name(), title=pf.getTitles(), img_url=pf.img_url,
-                     img_local_path=pf.img_local_path, ms=pf.ms, txts=pf.txts,
-                     boxes=pf.boxes, time=utils.msToH_M_S_str(pf.ms))
+        return Frame( id=pf.id, name=pf.get_name(), title=pf.getTitles(), img_url=pf.img_url,
+                      img_local_path=pf.img_local_path, ms=pf.ms, txts=pf.txts,
+                      boxes=pf.boxes, time=utils.msToH_M_S_str( pf.ms ) )
 
 
 @dataclass
@@ -66,7 +66,7 @@ class Video:
                      local_path=video.local_path,
                      chapter_id=video.chapter_id,
                      kfs=[Frame.create(pf) for pf in video.getKfs()],
-                     url=utils.local2url(video.local_path)
+                     url=utils.local2url( video.local_path )
                      )
 
 

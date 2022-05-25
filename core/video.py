@@ -1,8 +1,9 @@
+from PIL import Image
+import random
 from concurrent import futures
 from pathlib import Path
 import time
 from typing import List
-import warnings
 import filetype
 import shutil
 import glob
@@ -10,27 +11,23 @@ import cv2 as cv
 import numpy as np
 from paddleocr import PaddleOCR, draw_ocr
 import os
-
-from prometheus_client import Enum
+from enum import Enum
 # import paddle
-
 from . import utils, vo
-from .config import args
-from .sim_v1 import TextSimilarity
-from .config.path import RootPath
+from ..config import args
+from .sim_v2 import TextSimilarity
+from ..config.path import RootPath
 
-from vsearch.config import path
-
-if args.use_gpu:
+from ..config import path
+import paddle
+if args.Performance.use_gpu:
     print('启用GPU............')
-    import paddle
 
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-
     # @RISK 判断设备是否存在 再设置
     if paddle.get_device() != 'cpu':
-        paddle.set_device(args.gpu_name)
-    print(f'current use device: {args.gpu_name}')
+        paddle.set_device(args.Performance.gpu_name)
+    print(f'current use device: {args.Performance.gpu_name}')
 # paddle.set_device('gpu:0')
 
 """
@@ -53,7 +50,76 @@ del self.cap self.result 将 paddleOCR置出 节约持久化
 #     def searchByKey(self, key):
 #         pass
 
-from PIL import Image
+
+from threading import Semaphore
+
+
+class ThreadManager:
+
+    @staticmethod
+    def getPoolsExecutor(max_workers=None, mode=None):
+        '''
+            推荐设置: 不设置, 使用系统自动设置
+        '''
+        if max_workers is None:
+            max_workers = None if args.Performance.th_process_nums == 'auto' else args.Performance.th_process_nums
+        # @RISK 线程和进程的上限是多少合适, 好像系统会自动弄
+
+        if mode is None:
+            mode = args.Performance.process_mode
+
+        if mode == 'thread':
+            return futures.ThreadPoolExecutor(max_workers=max_workers)
+        elif mode == 'process':
+            return futures.ProcessPoolExecutor(max_workers=max_workers)
+        else:
+            return futures.ThreadPoolExecutor(max_workers=1)
+        # return futures.ProcessPoolExecutor()
+
+
+class OCR:
+    paddle_ocr_init_args = {
+        "det_model_dir": RootPath.det_model_dir,
+        "rec_model_dir": RootPath.rec_model_dir,
+        "cpu_threads": args.Performance.cpu_threads,
+        "enable_mkldnn": args.enable_mkldnn,
+        "det_db_box_thresh": args.det_db_box_thresh,
+        "det_db_unclip_ratio": args.det_db_unclip_ratio,
+        "show_log": False,
+        "use_angle_cls": False
+    }
+    '''
+        可以根据情况动态增加线程
+    '''
+
+    def __init__(self, ocr_num=args.Performance.ocr_num, ocr_load=args.Performance.ocr_load):
+        '''
+        ocr_num: 创建的OCR对象的个数
+        ocr_load: 每个OCR对象, 同时处理的线程的最大数量
+        '''
+        print("OCR对象创建成功!")
+        self.ocr_num = ocr_num
+        self.ocrs = [PaddleOCR(**self.paddle_ocr_init_args)
+                     for i in range(ocr_num)]
+        self.locks = [Semaphore(ocr_load) for i in range(ocr_num)]
+
+    def ocr(self):
+        pass
+
+    def ocr_save(self, **kwargs):
+        i = random.randint(0, self.ocr_num - 1)
+        self.locks[i].acquire()
+        result = self.ocrs[i].ocr(**kwargs)
+        self.locks[i].release()
+        return result
+
+
+# from threading import S
+# 现在考虑如何让一个线程并发两个线程, 幸好两
+
+
+# @RISK 每次导入都会执行一次
+my_ocr = OCR()
 
 
 # @WAIT 设计的不合理
@@ -79,14 +145,13 @@ class Searcher:
         # @WAIT 文件名包含 key, 可以避免重复请求 处理返回
         # @PERFORMANCE wait 算法流程优化
         # @WAIT 程名 + 章节名 + 视频名称 + key
-        print('需要读取的图片路径')
+        # print( '需要读取的图片路径' )
         # http://127.0.0.1:5000/static/vsearch-output/videos/pattern_pure_ppt/-0.png'
-        file_path = utils.url2local(pf.img_url)  # url路径转本地路径
-        frame = utils.cvimread(file_path)
-
-        im_show = draw_ocr(frame, pf.boxes)  # 圈出搜索结果
-        im_show = cv.cvtColor(im_show, cv.COLOR_BGR2RGB)  # 修正色域为Image读取正常
-        im_show = Image.fromarray(im_show)
+        file_path = utils.url2local( pf.img_url )  # url路径转本地路径
+        frame = utils.cvimread( file_path )
+        frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)  # 修正色域为Image读取正常
+        frame = draw_ocr(frame, pf.boxes)  # 圈出搜索结果
+        im_show = Image.fromarray(frame)
         # im_show shape h,w,c
 
         # 图片的输出目录 定义
@@ -96,11 +161,11 @@ class Searcher:
 
         # 用时间标识每次产出的图片的唯一性, 符合url的唯一定位特点
         file_path = f'{output_dir}\\_{int( time.time_ns() ) % 100000000}_.{args.img_format}'
-        print(f"处理过的图片保存路径: {file_path}")
+        # print( f"处理过的图片保存路径: {file_path}" )
         im_show.save(file_path)  # 结果图片保存在代码同级文件夹中, (output_dir下更准确)
-        img_url = utils.local2url(file_path)
+        img_url = utils.local2url( file_path )
         pf.img_url = img_url  # 此时的 pf中的img_url为框出搜索结果的图片url
-        print(f"图片url: {img_url}")
+        # print( f"图片url: {img_url}" )
         return pf
         # 图片保存
 
@@ -112,9 +177,6 @@ class Searcher:
         :param dir_path:
         :return:
         """
-        # @MODIFY 为了可以找到图片的路径, 就是有空格的情况
-        dir_path = dir_path.replace(" ", args.path_space_fill_char).replace(
-            "\t", args.path_space_fill_char)
         if not os.path.exists(dir_path):
             os.makedirs(dir_path, mode=0o777, exist_ok=True)
             # os.mkdir( dir_path )
@@ -134,15 +196,16 @@ class Searcher:
             功能: 根据搜索关键字返回各种各样的搜索结果
             @param: json_dumps  是否进行对搜索结果进行json序列化
         """
+        # name = utils.unify_file_name( name )
         # 重置搜索时间
         cls.__reset_time_stamp()
         o = None
         if _type == Assember.VIDEO:
-            o = utils.readObject(RootPath.output_video_object_dir, name)
+            o = utils.readObject( RootPath.output_video_object_dir, name )
         elif _type == Assember.CHAPTER:
-            o = utils.readObject(RootPath.output_chapter_object_dir, name)
+            o = utils.readObject( RootPath.output_chapter_object_dir, name )
         elif _type == Assember.COURSE:
-            o = utils.readObject(RootPath.output_course_object_dir, name)
+            o = utils.readObject( RootPath.output_course_object_dir, name )
         if o:  # 如果搜索到了内容
             return o.searchByKey(key, json_dumps)
         # dosearch
@@ -155,13 +218,14 @@ class Searcher:
 # @REQUIREMENT 不管是单个视频，还是章节， 还是课程， 都需要支持导出的功能，
 
 # PaddleOCR对象的创建, 方便后续算法的使用
-paddleOCR = PaddleOCR(
-    det_model_dir=RootPath.det_model_dir, rec_model_dir=RootPath.rec_model_dir,
-    cpu_threads=args.cpu_threads,
-    enable_mkldnn=args.enable_mkldnn,
-    det_db_box_thresh=args.det_db_box_thresh,
-    det_db_unclip_ratio=args.det_db_unclip_ratio
-)
+# paddleOCR = PaddleOCR(
+#     det_model_dir=RootPath.det_model_dir, rec_model_dir=RootPath.rec_model_dir,
+#     cpu_threads=args.cpu_threads,
+#     enable_mkldnn=args.enable_mkldnn,
+#     det_db_box_thresh=args.det_db_box_thresh,
+#     det_db_unclip_ratio=args.det_db_unclip_ratio,
+#     show_log=False
+# )
 
 
 # paddleOCR_video_inner = PaddleOCR(
@@ -187,7 +251,7 @@ class PaddleFrame:
     # def _name(self):
     #     return f'{self.video_id}  # {self.id}'
 
-    def __init__(self, id, frame, ms, img_outpath, video_id="", section_id=None):
+    def __init__(self, id, frame, ms, img_outpath, video_id="", section_id=None, ocr=my_ocr):
         """
         @WAIT 具体的id形式, 具体再确定
         params:
@@ -210,19 +274,21 @@ class PaddleFrame:
         self.outpath = img_outpath
         self.video_id = video_id
         self.ms = ms
-        self.blur_score = cv.Laplacian(frame, cv.CV_32F).var()
+        self.blur_score = cv.Laplacian(frame, cv.CV_32F).var()  # 拉普拉斯计算模糊度
+        self.contrast = self.frame_std = self.frame.std()  # 用图像标准差近似等同于对比度
         """
         @WAIT 返回的结果是否需要去除 停用词
         @PERFORMANCE 把np.array去除, 因为只有txts使用到np.array方法
         """
 
-        self.result = np.array(paddleOCR.ocr(frame, cls=False))  # 提取帧中的内容
+        self.result = np.array(ocr.ocr_save(img=frame, cls=False))  # 提取帧中的内容
         if len(self.result) == 0:  # 如果帧中没有内容
             self.has_txt = False
             self.boxes = np.array([])
             self.txts = np.array([])
             self.scores = np.array([])
             self.avg_score = 0
+            return
         else:  # 如果帧中有内容
             self.has_txt = True
             self.boxes = np.array(self.result[:, 0])
@@ -233,7 +299,7 @@ class PaddleFrame:
             # @NOTING 平均分数, 作用: 用于筛选 需要文字识别的框? 好像不需要
             self.avg_score = np.mean(self.scores)
             # self._save() # 有结果, 图片才需要保存
-        self.name = self.get_name()
+        # self.name = self.get_name()
 
     def get_name(self):
         """ 新增： 该获取帧的名字
@@ -241,22 +307,22 @@ class PaddleFrame:
         name = f"{self.video_id}{args.img_name_gap}{self.id}" if self.video_id != "" else f"{self.id}"
         if self.id != self.start_id:
             name = f"{name}{args.frame_name_gap}{self.start_id}"
-        if self.section_id is not None:
-            name = f'{self.section_id}{args.img_name_gap}{name}'
+        if args.section_gap and  self.section_id is not None:
+            name = f'{self.section_id}{args.section_gap}{name}'
         return name
 
     def __is_into_iter(self):
         """
            作用: 设定一系列条件, 判断当前帧是否需要,进行迭代的处理, 还是直接废弃
         """
-
+        return True  # 关闭下方的过滤器
         # 无内容过滤
         boxes = paddleOCR.text_detector(self.frame)[0]
         boxes_num = len(boxes)
         # print(f'boxes_num: {boxes_num}')
         if boxes_num == 0:
             return False
-        return True  # 关闭下方的过滤器
+
         th_min_box_height = Video.th_min_box_height  # @RISK 和视频的分辨率有关
         print(f'th_min_box_height: {th_min_box_height}')
 
@@ -361,12 +427,12 @@ class PaddleFrame:
         """
         return self.txts
 
-    def getAllTextStr(self) -> str:
+    def getAllTextStr(self, ignore_case=True, join_char='。') -> str:
         """
             功能: 将所有的文本变成字符串统一返回
             @RISK 没有任何分隔符号进行拼接
         """
-        return ",".join(self.txts)
+        return join_char.join(self.txts).casefold() if ignore_case else join_char.join(self.txts)
 
     def getAllTextLen(self):
         """
@@ -413,7 +479,7 @@ class PaddleFrame:
             name=self.get_name(),
             txts=txts,
             ms=self.ms,
-            time=utils.msToH_M_S_str(self.ms),
+            time=utils.msToH_M_S_str( self.ms ),
             title=self.getTitles(args.title_num),
         )
 
@@ -421,14 +487,13 @@ class PaddleFrame:
         if not result.isEmpty():
             vo_process_func and vo_process_func(
                 result)  # 保证vo_process_func存在的情况下, 处理vo
-        return utils.json_dumps(result) if json_dumps else result
+        return utils.json_dumps( result ) if json_dumps else result
 
     # def setOutPath(self, out_path):
     #     self.out_path = out_path
 
     def save(self):
-        img_path = utils.unify_path(
-            f"{self.outpath}\\{self.get_name()}.{args.img_format}")
+        img_path = f"{self.outpath}\\{self.get_name()}.{args.img_format}"
         # print( f'img_path: {img_path}' )
         # @note 中文路径图片保存
         cv.imencode(f".{args.img_format}", self.frame)[1].tofile(img_path)
@@ -436,7 +501,7 @@ class PaddleFrame:
         # cv.imdecode( np.fromfile(img_path, dtype=np.uint8 ), -1 )
         # 获取 root: vsearch-output  real: C/vsearch-output/
         # self.img_path = img_path
-        img_url = utils.local2url(img_path)
+        img_url = utils.local2url( img_path )
         # @modified 为了统一url路径, 而不是文件路径
         # @WAIT 将所有路径统一为 / 而不是window下的 \\
         # img_url = img_url.replace('\\', '/') # @MODIFY 修改为统一的
@@ -447,7 +512,7 @@ class PaddleFrame:
         del self.frame
         del self.result
 
-    def getSimScore(self, pre_pf):
+    def getSimScoreV1(self, pre_pf):
         """ "
         两帧之间文本相似度计算
         """
@@ -466,17 +531,21 @@ class PaddleFrame:
         """
         return TextSimilarity.getSimScoreV3(self.getAllTextStr(), nt_pf.getAllTextStr())
 
+    def getSimScore(self, nt_pf):
+        """ 最终选择的策略 """
+        return TextSimilarity.getSimScore(self.getAllTextStr(), nt_pf.getAllTextStr())
+
     def getSimScoreV4(self, nt_pf):
         """
-        @return ret, sim; （字符级别对比相似）
-        ret: 0: 相同 1：前比后大 -1： 后比前大
+            @return ret, sim; （字符级别对比相似）
+            ret: 0: 相同 1：前比后大 -1： 后比前大
         """
         return TextSimilarity.getSimScoreV4(self.getAllTextStr(), nt_pf.getAllTextStr())
 
     def getSimScoreV4_2(self, nt_pf):
         """
-        @return ret, sim; (jieba分词，去停用词)
-        ret: 0: 相同 1：前比后大 -1： 后比前大
+            @return ret, sim; (jieba分词，去停用词)
+            ret: 0: 相同 1：前比后大 -1： 后比前大
         """
         return TextSimilarity.getSimScoreV4_2(self.getAllTextStr(), nt_pf.getAllTextStr())
 
@@ -538,7 +607,7 @@ class KeyFrames:
     def getTail(self) -> PaddleFrame:
         if self._len() == 0:
             raise IndexError("当前列表为空")
-        return self.frame_list[self._len() - 1]
+        return self.get(self._len() - 1)
 
     def update(self, i, pf):
         self._check_valid(i)
@@ -570,7 +639,6 @@ class KeyFrames:
         return self.frame_list.pop(self._len() - 1)
 
     def remove_duplicate_v2(self) -> List[PaddleFrame]:
-        warnings.warn('还未投入使用', DeprecationWarning)
         """
         图片内容去重
         @WAIT 保留内容文字更多的 | 内容还有 时间节点做更改
@@ -584,7 +652,7 @@ class KeyFrames:
         pre_pf = frame_list[0]
         while i < self._len():  # i还在范围内容
             next_pf = frame_list[i]
-            ret, sim = pre_pf._getSimScoreV4(next_pf)
+            ret, sim = pre_pf.getSimScore(next_pf)
             if sim < args.th_sim_score:
                 pre_pf = next_pf
                 i += 1
@@ -647,7 +715,7 @@ class KeyFrames:
         return self._len()
 
     def is_empty(self):
-        return len(self.frame_list) == 0
+        return self._len() == 0
 
 
 class CWPathType(Enum):
@@ -724,16 +792,15 @@ class Video:
         self.caps = [cv.VideoCapture(video_path) for i in range(
             self.section_nums)]  # 每个分区一个cap不冲突
 
+        print('多分区PaddleOCR 初始化完成 ! ')
+
         if self.fps > 0:  # 有些垃圾的视频文件, 没有内容, 导致 除0的报错
             self.total_time_ms = self.frame_counts / self.fps * 1000
 
             self.old_frames = [None] * self.section_nums
             self._run()  # 运行完成产出关键帧
-            # @NOTE 多线程
-            with self._getPoolsExecutor() as executor:
-                executor.map(lambda kfs: kfs.saveKfs(),
-                             self.sections_kfs)  # 多线程保存
             del self.old_frames
+
             # @RISK 保存完成将 kfs: KeyFrame ->  kfs: list, 同时释放内存
 
         # 进行数据整合
@@ -746,18 +813,12 @@ class Video:
         #     self._run()
 
     def _getPoolsExecutor(self):
-        # return futures.ThreadPoolExecutor(max_workers=self.thread_nums)
-        if args.process_mode == 'thread':
-            return futures.ThreadPoolExecutor()
-        elif args.process_mode == 'process':
-            return futures.ProcessPoolExecutor()
-        else:
-            return futures.ThreadPoolExecutor(max_workers=1)
-        # return futures.ProcessPoolExecutor()
+        return ThreadManager.getPoolsExecutor(mode=args.Performance.video_process_mode,
+                                              max_workers=args.Performance.th_video_multiple_nums)
 
     def _fastProcess(self, func, args) -> list:
         with self._getPoolsExecutor() as executor:
-            return [result for result in executor.map(func, args)]
+            return list(executor.map(func, args))
 
     def _init_section(self):
         '''
@@ -766,9 +827,9 @@ class Video:
         '''
         self.process_frame_sum_counts = self.frame_counts // self.step  # 一个视频需要处理的视频帧
 
-        self.section_nums = self.thread_nums = self.process_frame_sum_counts // args.th_mul_thread_on_frame_counts  # 区间大小， 每个线程处理的任务量
+        self.section_nums = self.thread_nums = self.process_frame_sum_counts // args.Performance.th_mul_thread_on_frame_counts  # 区间大小， 每个线程处理的任务量
 
-        self.gap = args.th_mul_thread_on_frame_counts * self.step
+        self.gap = args.Performance.th_mul_thread_on_frame_counts * self.step
         if self.section_nums == 0:
             self.thread_nums = self.section_nums = 1  # 代表使用多线程
         print(f'v: {self.name} 需要遍历的帧为： {self.process_frame_sum_counts}')
@@ -779,6 +840,9 @@ class Video:
              1] if i == (self.section_nums - 1) else [i * self.gap, (i + 1) * self.gap]
             for i in range(self.section_nums)
         ]  # sections = [ [0, 400], []  ]
+
+    def getKfs(self):
+        return [kf for s_kfs in self.sections_kfs for kf in s_kfs]
 
     def searchByKey(self, key, json_dumps=False):
         """
@@ -803,9 +867,10 @@ class Video:
             kfs += result
 
         result = vo.Video(
-            id=self.id, kfs=kfs, name=self.name, local_path=self.local_path, chapter_id=self.chapter_id
+            id=self.id, kfs=kfs, name=self.name, local_path=self.local_path, chapter_id=self.chapter_id, url=utils.local2url(
+                self.local_path)
         )
-        return utils.json_dumps(result) if json_dumps else result
+        return utils.json_dumps( result ) if json_dumps else result
 
     def __generate_courseware(self, path_type: CWPathType) -> str:
         """ 生成课件
@@ -814,14 +879,14 @@ class Video:
         if not self.courseware_path:
             # @MODIFY 如果课件不存在就会重新生成, 所以可以随便删除
             imgs = [
-                pf.img_local_path for kfs in self.sections_kfs for pf in kfs.remove_duplicate_v2()]
+                pf.img_local_path for kfs in self.sections_kfs for pf in kfs]
             if len(imgs) == 0:
                 return "不存在课件？"  # @RISK 就算什么东西也没有，也最好返回一个封面吧
-            self.courseware_path = utils.imgs2pdf(imgs, file_name=self.name)
+            self.courseware_path = utils.imgs2pdf( imgs, file_name=self.name )
         # @RISKED 如果课件存在过期时间, 导致课件被删除怎么办?
 
         # 因此 @WAIT 需要有一个判断地址是存在课件的方法
-        return self.courseware_path if path_type is CWPathType.LOCAL else utils.local2url(self.courseware_path)
+        return self.courseware_path if path_type is CWPathType.LOCAL else utils.local2url( self.courseware_path )
 
     def get_courseware_path(self, return_path_type: CWPathType = CWPathType.LOCAL):
         return self.__generate_courseware(path_type=return_path_type)
@@ -837,18 +902,11 @@ class Video:
         print("------------------------------")
         # print(f"有效帧数: {self.processed_kfs_count}  当前帧: {pf.id}")
         print(
-            f'第 {section_id} 区， 有效帧数为： {len( self.sections_kfs[section_id] )} ')
+            f'{pf.get_name()}\ncontent: {pf.getAllTextArray()}\n第 {section_id} 区， 有效帧数为： {len( self.sections_kfs[section_id] )} ')
+        cur_kfs = self.sections_kfs[section_id]
+        old_pf = self.old_frames[section_id]
 
-        # cv.imshow('v1', pf.frame)
-        # cv.waitKey(1)
-        # 增加模糊度, 对比度判断
-        # contrast_score = contrastScore(pf.frame)
-
-        # print(
-        #     f"{pf.id} / {self.frame_counts} \navg_score : {pf.avg_score} \nblur_score: {pf.blur_score}"
-        # )
-
-        def link_up(pf: PaddleFrame, old_pf: PaddleFrame):
+        def link_up(pf: PaddleFrame, old_pf: PaddleFrame = self.old_frames[section_id]):
             """ 进行帧之间的衔接操作 """
             pf.start_id = old_pf.start_id
             pf.ms = old_pf.ms
@@ -856,109 +914,193 @@ class Video:
         def set_old_frame(pf: PaddleFrame):
             self.old_frames[section_id] = pf
 
-        if (not pf.is_into_iter) or (pf.blur_score < args.th_blur_score) or (pf.avg_score < args.th_avg_score) or (
-                not pf.has_txt) or (self.old_frames[section_id] is None):
-            if self.old_frames[section_id] is None:
-                print(f'（初始帧）{pf.get_name()}, 内容： {pf.getAllTextArray()} ')
-                # @NOTING为什么要加？ 因为，上面的所有条件符合，说明它是课件帧， 说明可以进入后续的循环处理，但是kfs没东西，直接加入课件帧列表就好了
-                self.sections_kfs[section_id].add(pf)
-            else:
-                link_up(pf, self.old_frames[section_id])
+        def kfs_update(pf: PaddleFrame):
+            """
+                需要保证加入的帧为关键帧
+            """
+            # def decision(pf: PaddleFrame, other_pf: PaddleFrame):
+            #     d = [900, 990]
+            #     np.abs( (d[0] - d[1]) / sum( d ) )
 
+            kfs = self.sections_kfs[section_id]
+            if kfs.is_empty():
+                kfs.add(pf)
+            else:  # 直接加入？需要保证为关键帧
+                # link_up(pf) # 衔接
+                ret, sim = kfs.getTail().getSimScore(pf)
+                if sim > args.th_sim_score:  # 相似
+                    if ret == 1:  # pf内容多
+                        link_up(pf, kfs.getTail())
+                        kfs.updateTail(pf)
+                    elif ret == 0:  # @RISK 通过相似度判断内容增加减少, 有局限性, 带有英文的, 单词会被压缩成字母, abc 和 abccccc 没有区别, 会判断为内容相同
+                        pf_len, tail_len = pf.getAllTextLen(), kfs.getTail().getAllTextLen()
+                        if pf_len > tail_len:  # 修复局限性, 对比内容的长度
+                            link_up(pf, kfs.getTail())
+                            kfs.updateTail(pf)
+
+                        elif pf_len == tail_len:  # 长度相同, 选择更清晰的 @RISK @HYPOTHESIS 假设paddle ocr 的 文本框检测的分数得分, 代表文本清晰度, 因为越清晰越容易被检测到
+                            '''
+                                1. 远近切换，选择近处的，也就是大屏幕优先： 其实就是字体大的优先，也就是框框长度总和更长的优先 | 
+                                2. 对比度大的优先
+                                3. 更清晰的优先
+                                我感觉 大屏幕的 优先级别最高把
+
+                                TODO： 大屏幕兼容， 英文PPT的兼容处理 
+                            '''
+                            # pf.boxes # 格式是什么样的呢 需要print一下
+                            if pf.contrast > kfs.getTail().contrast:
+                                link_up(pf, kfs.getTail())
+                                kfs.updateTail(pf)
+                            # if pf.blur_score > kfs.getTail().blur_score: # pf.avg_score > kfs.getTail().avg_score or
+                            #     link_up( pf, kfs.getTail() )
+                            #     kfs.updateTail( pf )
+                        else:  # 内容是真的没变化
+                            return
+                    else:  # 内容减少, 丢掉就好了
+                        return
+                else:  # 不相似
+                    kfs.add(pf)
+
+        if (not pf.is_into_iter) or (pf.blur_score < args.th_blur_score) or (pf.avg_score < args.th_avg_score) or (
+                not pf.has_txt):
+            # print( f"{pf.get_name()}过滤了" )
+            # 过滤
+            set_old_frame(pf)  # 动画过渡, 其实可以做成, with语句
+            return
+        if old_pf is None:
+            # @NOTING为什么要加？ 因为，上面的所有条件符合，说明它是课件帧， 说明可以进入后续的循环处理，但是kfs没东西，直接加入课件帧列表就好了
+            if cur_kfs.is_empty():
+                kfs_update(pf)
             set_old_frame(pf)
             return
 
-        if self.sections_kfs[section_id].is_empty():
-            print('=======================================')
-            print('=======================================')
-            print('=======================================')
-            print('=======================================')
+        # if cur_kfs.is_empty():
+        #     print( '=======================================' )
+        #     print( '=======================================' )
+        #     print( '=======================================' )
+        #     print( '=======================================' )
 
-        # origin_pf = cp.deepcopy( pf )  # @MODIFY 好像没有必要存在
-
+        # def kfs_add(pf: PaddleFrame):
+        #     kfs = self.sections_kfs[section_id]
+        #     if not kfs.is_empty():
+        #         ret, sim = kfs.getTail().getSimScore(pf)
+        #         if sim > args.th_sim_score:
+        #             if ret == 1: # pf内容多
+        #                 kfs.updateTail(pf)
+        #             elif ret == 0:
+        #                 if pf.blur_score > kfs.getTail().blur_score:
+        #                     kfs.updateTail(pf)
+        #             else: # 内容减少, 丢掉就好了
+        #                 return
+        #         else:
+        #             kfs.add(pf)
+        #     else:
+        #         kfs.add(pf)
         # @WAIT 具体的相似度算法可以参考策略模式, 将具体使用哪个相似度算法, 抽象成接口, 或者配置, 可以直接切换, 而不是这里写死
-        ret, sim_score_old = pf.getSimScoreV4(self.old_frames[section_id])
-        sim_score = 0
+        ret_old, sim_score_old = pf.getSimScore(old_pf)
+        # ret_kfs_tail, sim_score_kfs_tail = pf.getSimScore(cur_kfs.getTail())
+        # sim_score = max(sim_score_old, sim_score_kfs_tail)
 
-        # 两步计算相似度, 解决状况:  PPT内容展示有动画, 例如: 内容: a -> 过渡动画 -> ab, 其实还是同一页, 但是如果只计算sim(old, cur), a变模糊, 再到没有a->插入列表->再出现ab
-        if self.sections_kfs[section_id].is_empty():
-            sim_score = sim_score_old
-        else:
-            tail_frame = self.sections_kfs[section_id].getTail()
-            ret, sim_score_kfs_tail = pf.getSimScoreV4(tail_frame)
-            # 如果分数高的是末尾
-            sim_score = max(sim_score_old, sim_score_kfs_tail)
-        # 还需要修复 关键点1 -> full, 再来一次 1-> full, 会导致重复的发生
-        # @PERFORMANCE 去重的操作如果影响性能, 可以提供用户点击去重效果
-        print(f"sim_score: {sim_score}")
-        # @WAIT 逆向相似度 > 正向相似度, 说明在减少内容, 是动画
-
-        # 内容增加判断
-        if sim_score > args.th_sim_score:  # 判断是否相似
-            # 增加内容的比较, 也要和 tail末尾的比较, 不过得相似的前提下
-            # 内容增加
-            # @RISK 用字符串判别也行
-            if pf.getAllTextLen() > self.old_frames[section_id].getAllTextLen():
-
-                # pf.name = pf.name + \
-                #     f"{args.frame_name_gap}{self.old_frames[section_id].id}"
-                if self.sections_kfs[section_id].is_empty():  # 如果关键帧列表为空
-                    link_up(pf, self.old_frames[section_id])
-                    self.sections_kfs[section_id].add(pf)
-                    # print(
-                    #     f"上一帧内容: {self.old_frames[section_id].getAllTextArray()}   这一帧率的内容: {pf.getAllTextArray()}")
-                    print(f"（第一帧）加入一帧: {pf.get_name()}")
-                    print(
-                        f"上一帧内容: {self.old_frames[section_id].getAllTextArray()}  \n这一帧率的内容: {pf.getAllTextArray()}")
-                    set_old_frame(pf)
-                else:
-                    tail_frame = self.sections_kfs[section_id].getTail()
-                    link_up(pf, self.old_frames[section_id])
-                    self.sections_kfs[section_id].updateTail(pf)
-                    print(
-                        f"(内容增加)当前帧: {pf.get_name()}  被替换帧: {tail_frame.get_name()}")
-                    print(
-                        f"当前帧内容: {pf.getAllTextArray()} \n kfs被替换内容: {tail_frame.getAllTextArray()}")
-                    set_old_frame(pf)
-
-            # 内容减少
-            elif pf.getAllTextLen() < self.old_frames[section_id].getAllTextLen():
-                # 保留内容多的一帧, 就是oldframe不能变,这个意思
-                link_up(pf, self.old_frames[section_id])
-                set_old_frame(pf)  # 为了保留上一帧的特性
-
-            else:  # 图片内容相同, 且内容没有增加了,
-                if not self.sections_kfs[section_id].is_empty():
-                    tail_frame = self.sections_kfs[section_id].getTail()
-                    if pf.blur_score > tail_frame.blur_score:  # 保留图片清晰图更好的图像
-                        # tail_frame.blur_score = pf.blur_score
-                        # tail_frame.frame = pf.frame
-                        link_up(pf, self.old_frames[section_id])
-                        self.sections_kfs[section_id].updateTail(
-                            pf)
-                        print(
-                            f"(内容不变)当前帧: {pf.get_name()}  kfs——tail: {tail_frame.get_name()}")
-                        print(
-                            f"当前帧内容: {pf.getAllTextArray()} \n 被替换内容: {tail_frame.getAllTextArray()}")
+        if sim_score_old > args.th_sim_score:  # 前后帧相似 | 不进行帧的添加, 动画过渡
+            # link_up( pf, old_pf )
+            if ret_old == -1:  # 内容增加
+                kfs_update(pf)
                 set_old_frame(pf)
-                # self.old_frames[section_id] = origin_pf
-        else:  # 不相似
-            # print(
-            #     f"上一帧内容: {self.old_frames[section_id].getAllTextArray()}   这一帧率的内容: {pf.getAllTextArray()}")
-            # link_up(pf, self.old_frames[section_id])
-            tail_frame = self.sections_kfs[section_id].getTail()
-            print(
-                f"相似度低: {sim_score}  加入一帧: {pf.get_name()}  上一关键帧: {tail_frame.get_name()}")
-            print(
-                f"当前帧: {pf.getAllTextArray()}  \n 上一kfs帧: {tail_frame.getAllTextArray()}")
-            self.sections_kfs[section_id].add(pf)
+
+            elif ret_old == 1:  # 内容减少, 不理睬
+                # link_up( pf )
+                set_old_frame(pf)
+
+            else:  # 内容不变
+                if pf.blur_score > old_pf.blur_score:  # 更清晰
+                    # link_up( pf )
+                    kfs_update(pf)
+                set_old_frame(pf)
+
+        else:  # 前后帧区别很大 | 对比kfs
+            # link_up( pf )
+            kfs_update(pf)
             set_old_frame(pf)
 
-        # 指定一系列过滤条件
-        # 如果 分数大于 0.95, 不保留,
-        # 如果没有内容 也不保留
-        # self.old_frames[section_id] = origin_pf # 到了最后还是变了啊
-        print("------------------------------")
+        # 两步计算相似度, 解决状况:  PPT内容展示有动画, 例如: 内容: a -> 过渡动画 -> ab, 其实还是同一页, 但是如果只计算sim(old, cur), a变模糊, 再到没有a->插入列表->再出现ab
+        # if self.sections_kfs[section_id].is_empty():
+        #     sim_score = sim_score_old
+        # else:
+        #     tail_frame = self.sections_kfs[section_id].getTail()
+        #     ret, sim_score_kfs_tail = pf.getSimScore(tail_frame)
+        #     # 如果分数高的是末尾
+        #     sim_score = max(sim_score_old, sim_score_kfs_tail)
+        # 还需要修复 关键点1 -> full, 再来一次 1-> full, 会导致重复的发生
+        # @PERFORMANCE 去重的操作如果影响性能, 可以提供用户点击去重效果
+        # print(f"sim_score: {sim_score}")
+        # # @WAIT 逆向相似度 > 正向相似度, 说明在减少内容, 是动画
+        #
+        # # 内容增加判断
+        # if sim_score > args.th_sim_score:  # 判断是否相似
+        #     # 增加内容的比较, 也要和 tail末尾的比较, 不过得相似的前提下
+        #     # 内容增加
+        #     # @RISK 用字符串判别也行
+        #     if pf.getAllTextLen() > self.old_frames[section_id].getAllTextLen():
+        #
+        #         # pf.name = pf.name + \
+        #         #     f"{args.frame_name_gap}{self.old_frames[section_id].id}"
+        #         if self.sections_kfs[section_id].is_empty():  # 如果关键帧列表为空
+        #             link_up(pf, self.old_frames[section_id])
+        #             self.sections_kfs[section_id].add(pf)
+        #             # print(
+        #             #     f"上一帧内容: {self.old_frames[section_id].getAllTextArray()}   这一帧率的内容: {pf.getAllTextArray()}")
+        #             print(f"（第一帧）加入一帧: {pf.get_name()}")
+        #             print(
+        #                 f"上一帧内容: {self.old_frames[section_id].getAllTextArray()}  \n这一帧率的内容: {pf.getAllTextArray()}")
+        #             set_old_frame(pf)
+        #         else:
+        #             tail_frame = self.sections_kfs[section_id].getTail()
+        #             link_up(pf, self.old_frames[section_id])
+        #             self.sections_kfs[section_id].updateTail(pf)
+        #             print(
+        #                 f"(内容增加)当前帧: {pf.get_name()}  被替换帧: {tail_frame.get_name()}")
+        #             print(
+        #                 f"当前帧内容: {pf.getAllTextArray()} \n kfs被替换内容: {tail_frame.getAllTextArray()}")
+        #             set_old_frame(pf)
+        #
+        #     # 内容减少
+        #     elif pf.getAllTextLen() < self.old_frames[section_id].getAllTextLen():
+        #         # 保留内容多的一帧, 就是oldframe不能变,这个意思
+        #         link_up(pf, self.old_frames[section_id])
+        #         set_old_frame(pf)  # 为了保留上一帧的特性
+        #
+        #     else:  # 图片内容相同, 且内容没有增加了,
+        #         if not self.sections_kfs[section_id].is_empty():
+        #             tail_frame = self.sections_kfs[section_id].getTail()
+        #             if pf.blur_score > tail_frame.blur_score:  # 保留图片清晰图更好的图像
+        #                 # tail_frame.blur_score = pf.blur_score
+        #                 # tail_frame.frame = pf.frame
+        #                 link_up(pf, self.old_frames[section_id])
+        #                 self.sections_kfs[section_id].updateTail(
+        #                     pf)
+        #                 print(
+        #                     f"(内容不变)当前帧: {pf.get_name()}  kfs——tail: {tail_frame.get_name()}")
+        #                 print(
+        #                     f"当前帧内容: {pf.getAllTextArray()} \n 被替换内容: {tail_frame.getAllTextArray()}")
+        #         set_old_frame(pf)
+        #         # self.old_frames[section_id] = origin_pf
+        # else:  # 不相似
+        #     # print(
+        #     #     f"上一帧内容: {self.old_frames[section_id].getAllTextArray()}   这一帧率的内容: {pf.getAllTextArray()}")
+        #     # link_up(pf, self.old_frames[section_id])
+        #     tail_frame = self.sections_kfs[section_id].getTail()
+        #     print(
+        #         f"相似度低: {sim_score}  加入一帧: {pf.get_name()}  上一关键帧: {tail_frame.get_name()}")
+        #     print(
+        #         f"当前帧: {pf.getAllTextArray()}  \n 上一kfs帧: {tail_frame.getAllTextArray()}")
+        #     self.sections_kfs[section_id].add(pf)
+        #     set_old_frame(pf)
+        #
+        # # 指定一系列过滤条件
+        # # 如果 分数大于 0.95, 不保留,
+        # # 如果没有内容 也不保留
+        # # self.old_frames[section_id] = origin_pf # 到了最后还是变了啊
+        # print("------------------------------")
 
     def _run(self):
         '''' 分配任务
@@ -991,20 +1133,42 @@ class Video:
 
                 @RISKED：什么情况下，两帧都不要了呢？当然是两帧都没有内容的情况下，但是该情况已经被考虑过了，所以忽略。即按照预定方法，能留下来的帧都是有用的帧。因此不存在该情况。
         """
-        args = (self.sections, list(range(self.section_nums)))
+        # args = (self.sections, list( range( self.section_nums ) ))
         # for arg in zip(*args):
         #     print(arg)
         # arg：section, section_id:  [0, 400], 1
-        with self._getPoolsExecutor() as executor:
+        with self._getPoolsExecutor() as executor:  # 应该在这里传入各种各样的需要阐述才对, 比如KFS,OCR等资源, 而不是通过ID号来获取
+            args = (self.sections, list(range(self.section_nums)))
             executor.map(self._process_section, *args)
-        self._duplicateSectionKfs()  # 去重完毕
+
+        # 打印 帧列表名字
+        # print( '===================================' )
+        old_frame = [None]
+
+        # def print_pf_content(pf: PaddleFrame):
+        #     print( '------------------' )
+        #     if old_frame[0] is None:
+        #         print( f'{pf.get_name()}\ncontent: {pf.getAllTextStr()}' )
+        #     else:
+        #         print( f'{pf.get_name()}\ncontent: {pf.getAllTextStr()}' )
+        #         print(
+        #             f'{old_frame[0].get_name()}\ncontent: {old_frame[0].getAllTextStr()}' )
+        #         print( f'{pf.getSimScore( old_frame[0] )}' )
+        #     old_frame[0] = pf
+
+        # [print_pf_content( pf ) for kfs in self.sections_kfs for pf in kfs] # 打印去重之前的所有图片名
+        # print( '===================================' )
+        # utils.saveObject(path.getProjectRootPath(), self.sections_kfs, 'test6_sections_kfs')
+        self._duplicateSectionKfs()  # 边界去重
+        with self._getPoolsExecutor() as executor:  # 保存图片，利于后续保存可见你
+            executor.map(lambda kfs: kfs.saveKfs(), self.sections_kfs)
 
     def _duplicateSectionKfs(self):
-
+        # self.all_kfs = []
         deleted_pf = KeyFrames()
         # 在加一个关键帧区间的去重
-        print(
-            f'去重前 -> 有效帧: {sum( [len( kfs ) for kfs in self.sections_kfs] )}')
+        deleted_pre_count = sum([len(kfs) for kfs in self.sections_kfs])
+
         if self.section_nums > 1:
             pre_kfs = self.sections_kfs[0]
             i = 1
@@ -1017,14 +1181,19 @@ class Video:
                 """
                 # for i in range(1, self.section_nums):
                 next_kfs = self.sections_kfs[i]
-                if pre_kfs.is_empty() or next_kfs.is_empty():  # 一个为空, 右移
+                if pre_kfs.is_empty():  # 一个为空, 右移
+                    self.sections_kfs.pop(i - 1)  # 空了就没必要留着
+                    self.section_nums = self.thread_nums = self.section_nums - 1
                     pre_kfs = next_kfs
-                    i += 1
+                    continue
+                elif next_kfs.is_empty():  # 后面为空
+                    self.sections_kfs.pop(i)
+                    self.section_nums = self.thread_nums = self.section_nums - 1
                     continue
                 else:
                     pre_pf = pre_kfs.getTail()
                     next_pf = next_kfs.getHead()
-                    ret, sim = pre_pf.getSimScoreV4(next_pf)
+                    ret, sim = pre_pf.getSimScore(next_pf)
                     # ret: 0: 相同 1：前比后大 -1： 后比前大
                     if sim > args.th_sim_score:  # 需要进行比较, 至少去除一个, 那么去除后需要重新比较, 所以i不变
                         # 删除, 并且删除信息少的那一个 | 哪个信息少，前/后 分数高，则后内容多
@@ -1035,16 +1204,17 @@ class Video:
                             pre_pf.start_id = f'{pre_pf.start_id}$'
                             deleted_pf.add(pre_pf)
                         else:  # 0 1 前面的信息多， 保前去后
-                            # pre_pf.id = next_pf.id
-                            # pre_pf
+                            pre_pf.id = next_pf.id  # 衔接
                             next_kfs.popHead()
                             next_pf.start_id = f'{next_pf.start_id}$'
                             deleted_pf.add(next_pf)
                     else:  # 不需要改动, 进行右移
-                        i += 1
+                        pre_kfs = next_kfs  # 区域右移动
+                        i += 1  # 区域右移动
                         # else: # 信息一样多，保留更清晰的
                         #     if pre_pf.avg_score > next_pf.avg_score:
-        print(f'去重后-> 有效帧: {sum( [len( kfs ) for kfs in self.sections_kfs] )}')
+        print(
+            f'课件帧的数量\n去重前： {deleted_pre_count}\n去重后: {sum( [len( kfs ) for kfs in self.sections_kfs] )}')
         deleted_pf.saveKfs()
 
     def get_section_kfs_size(self, section_id):
@@ -1054,6 +1224,9 @@ class Video:
         return sum([len(kfs) for kfs in self.sections_kfs])
 
     def _process_section(self, section: tuple, section_id: int):
+        """ 
+        功能： 处理一个section中的内容 | 区间去重
+         """
         print(
             f"current section: {section}, section_id: {section_id}")
 
@@ -1067,25 +1240,27 @@ class Video:
         # )
         # 设置初始位置
         self.caps[section_id].set(cv.CAP_PROP_POS_FRAMES, low_pos)
-        print('能有这一步吗')
 
+        # is_out_of_index = False  # 是否已经越界
         # 开始正式的处理
         while True:
             current_pos = self.caps[section_id].get(cv.CAP_PROP_POS_FRAMES)
-            if current_pos > hight_pos:  # 如果已经越界了，停止操作
+            if current_pos > hight_pos - 1:  # 大于就置顶
+                # self.caps[section_id].set( cv.CAP_PROP_POS_FRAMES, hight_pos )
+                # is_out_of_index = True
                 return
             ret, frame = self.caps[section_id].read()
-            print(type(frame))
             if ret:
                 # 当前位置id帧编号, base-0开始编号， @NOTING　为什么　这里需要　－１　呢， 回退到上一帧吗？
                 frame_id = int(current_pos)
                 frame_ms = self.caps[section_id].get(cv.CAP_PROP_POS_MSEC)
                 print(
-                    f'第 {section_id} 区: 进度: {frame_id - low_pos}/{hight_pos - low_pos}')
+                    f'第 {section_id} 区 {section}: 进度: {frame_id - low_pos}/{hight_pos - low_pos}')
                 # 增加一层, 框框数太多, 为代码也, 框框的高度大小, 代码也
                 self._section_iter_func(
                     pf=PaddleFrame(
-                        frame_id, frame, frame_ms, self.output_dir, self.id, section_id=section_id
+                        frame_id, frame, frame_ms, self.output_dir, self.id, section_id=section_id,
+                        ocr=my_ocr
                     ),
                     section_id=section_id
                 )
@@ -1093,6 +1268,9 @@ class Video:
                     cv.CAP_PROP_POS_FRAMES, frame_id + self.step)
             else:
                 break
+
+        # 去重 @RISK 正常情况下不需要去重
+        # self.sections_kfs[section_id].remove_duplicate_v2()
         print('------------------------------------------')
         print(f'section {section_id} 处理完毕 ! ')
         print(f'当前分区有效帧为:  {self.get_section_kfs_size( section_id )}')
@@ -1132,19 +1310,26 @@ class Chapter:
         ]
         需求:　需要有序的排序
         """
-        videos = []
-        for v in self.videos:
-            video_vo = v.searchByKey(key)
-            # if args.search_result_dict_mode:
-            #     if video_vo['kfs']:
+        # videos = []
+
+        with ThreadManager.getPoolsExecutor() as executor:
+            args = (self.videos, [key] * len(self.videos))
+            video_vos = list(executor.map(
+                lambda v, key: v.searchByKey(key), *args))
+            # WAIT 去空集合, 其实也不一定有必要去, 去了之后目录结构没那么完整
+            videos = [v for v in video_vos if not v.isEmpty()]
+            # for v in self.videos:
+            #     video_vo = v.searchByKey( key )
+            #     # if args.search_result_dict_mode:
+            #     #     if video_vo['kfs']:
+            #     #         videos.append( video_vo )
+            #     # else:
+            #     if not video_vo.isEmpty():
             #         videos.append( video_vo )
-            # else:
-            if not video_vo.isEmpty():
-                videos.append(video_vo)
-        result = vo.Chapter(
-            id=self.id, videos=videos, name=self.name, course_id=self.course_id
-        )
-        return utils.json_dumps(result) if json_dumps else result
+            result = vo.Chapter(
+                id=self.id, videos=videos, name=self.name, course_id=self.course_id
+            )
+            return utils.json_dumps( result ) if json_dumps else result
 
 
 class Course:
@@ -1167,17 +1352,23 @@ class Course:
         return self.chapters[index]
 
     def searchByKey(self, key, json_dumps=False) -> vo.Course:
-        chapters = []
-        for c in self.chapters:
-            chapter_vo = c.searchByKey(key)
-            # if args.search_result_dict_mode:
-            #     if chapter_vo['videos']:
+        with ThreadManager.getPoolsExecutor() as executor:
+            args = (self.chapters, [key] * len(self.chapters))
+            cos = list(executor.map(lambda chapter,
+                       key: chapter.searchByKey(key), *args))
+            cos = [c for c in cos if not c.isEmpty()]
+            # chapters = []
+            #
+            # for c in self.chapters:
+            #     chapter_vo = c.searchByKey( key )
+            #     # if args.search_result_dict_mode:
+            #     #     if chapter_vo['videos']:
+            #     #         chapters.append( chapter_vo )
+            #     # else:
+            #     if not chapter_vo.isEmpty():
             #         chapters.append( chapter_vo )
-            # else:
-            if not chapter_vo.isEmpty():
-                chapters.append(chapter_vo)
-        result = vo.Course( id=self.id, chapters=chapters, name=self.name )
-        return utils.json_dumps(result) if json_dumps else result
+            result = vo.Course( id=self.id, chapters=cos, name=self.name )
+            return utils.json_dumps( result ) if json_dumps else result
 
 
 class Assember:
@@ -1202,18 +1393,26 @@ class Assember:
         output_dir = output_dir + "\\" + dir_name
         # @modified 修改了路径
         output_dir = Assember._setDir(output_dir)
-
-        chapters = [
-            Assember.executeChapter(
-                chapter_path=dir_path,
+        with ThreadManager.getPoolsExecutor(mode=args.Performance.course_process_mode,
+                                            max_workers=args.Performance.th_course_multiple_nums) as executor:
+            chapters = list(executor.map(lambda arg: Assember.executeChapter(
+                chapter_path=arg[1],
                 output_dir=output_dir,
-                chapter_id=i + 1,
-                chapter_name=os.path.basename(dir_path),
+                chapter_id=arg[0] + 1,
+                chapter_name=os.path.basename(arg[1]),
                 course_id=course_id,
-            )
-            for i, dir_path in enumerate(chapter_dirs)
-        ]
-        return Course(id=course_id, name=dir_name, chapters=chapters)
+            ), enumerate(chapter_dirs)))
+            # chapters = [
+            #     Assember.executeChapter(
+            #         chapter_path=dir_path,
+            #         output_dir=output_dir,
+            #         chapter_id=i + 1,
+            #         chapter_name=os.path.basename( dir_path ),
+            #         course_id=course_id,
+            #     )
+            #     for i, dir_path in enumerate( chapter_dirs )
+            # ]
+            return Course(id=course_id, name=dir_name, chapters=chapters)
 
     @staticmethod
     def executeChapter(
@@ -1231,18 +1430,29 @@ class Assember:
         output_dir = output_dir + "\\" + chapter_name
         # @modified 修改了路径
         output_dir = Assember._setDir(output_dir)
-        videos = [
-            Assember.executeVideo(
-                video_path=v_path,
-                output_dir=output_dir,
-                video_id=i + 1,
-                chapter_id=chapter_id,
+
+        with ThreadManager.getPoolsExecutor(mode=args.Performance.chapter_process_mode,
+                                            max_workers=args.Performance.th_chapter_multiple_nums) as executor:
+            videos = list(
+                executor.map(lambda arg: Assember.executeVideo(
+                    video_path=arg[1],
+                    output_dir=output_dir,
+                    video_id=arg[0] + 1,
+                    chapter_id=chapter_id,
+                ),  enumerate(video_paths))
             )
-            for i, v_path in enumerate(video_paths)
-        ]
-        return Chapter(
-            id=chapter_id, name=chapter_name, course_id=course_id, videos=videos
-        )
+            # videos = [
+            #     Assember.executeVideo(
+            #         video_path=v_path,
+            #         output_dir=output_dir,
+            #         video_id=i + 1,
+            #         chapter_id=chapter_id,
+            #     )
+            #     for i, v_path in enumerate( video_paths )
+            # ]
+            return Chapter(
+                id=chapter_id, name=chapter_name, course_id=course_id, videos=videos
+            )
 
     @staticmethod
     def executeVideo(
@@ -1251,21 +1461,25 @@ class Assember:
             video_id="",
             chapter_id="",
             name="",
+            save=False
     ) -> Video:
-        print(f'RootPath.output_videos_dir: {RootPath.output_videos_dir}')
-        print(f"output_dir: {output_dir}")
+        # print( f'RootPath.output_videos_dir: {RootPath.output_videos_dir}' )
+        # print( f"output_dir: {output_dir}" )
         output_dir = output_dir + (
             name or ("\\" + os.path.basename(video_path).split(".")[0])
         )
         # @modified 修改了路径
         output_dir = Assember._setDir(output_dir)
-        return Video(
+        v = Video(
             video_path=video_path,
             output_dir=output_dir,
             video_id=video_id,
             chapter_id=chapter_id,
             name=name,
         )
+        if save:
+            utils.saveObject( path.RootPath.output_video_object_dir, v )
+        return v
 
     @classmethod
     def execute(cls, _type, resource_root_path, output_dir='', id="", name="", parent_id=""):
@@ -1286,7 +1500,7 @@ class Assember:
             r = cls.executeVideo(resource_root_path, output_dir,
                                  video_id=id, chapter_id=parent_id, name=name)
         if r:
-            r.name = utils.saveObject(output_object_path, r)
+            r.name = utils.saveObject( output_object_path, r )
         return r
 
     @staticmethod
@@ -1309,9 +1523,6 @@ class Assember:
         :param dir_path:
         :return:
         """
-        # @MODIFY 为了可以找到图片的路径
-        dir_path = dir_path.replace(" ", args.path_space_fill_char).replace(
-            "\t", args.path_space_fill_char)
         if not os.path.exists(dir_path):
             os.makedirs(dir_path, mode=0o777, exist_ok=True)
             # os.mkdir( dir_path )

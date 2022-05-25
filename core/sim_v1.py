@@ -9,8 +9,8 @@ from collections import Counter
 #  字符串还是文本列表, 或者OCR已经算分词了吗
 # 该版本 输入: 为list  或者 str都可以
 
-from .config import path
-from .config import args
+from vsearch.config import path
+from vsearch.config import args
 
 f_path = f'{path.RootPath.step_word_path}\\{args.stop_word_file}'
 result = pd.read_csv(f_path, sep='\n\r', names=['word'], encoding='gbk')

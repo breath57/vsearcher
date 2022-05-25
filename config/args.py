@@ -69,12 +69,12 @@ th_max_codeline_num = 7  # 最大代码框的数量, 大于该值判断为代码
 #   th_max_boxes_num = 66  # 所有框的数量不能大于
 
 img_format = "png"  # 图片保存的格式
-img_name_gap = "-"  # 1-1072%804.png | 1代表章节
-file_name_gap = '_'
+img_name_gap = "-"  # 1-1072%804.png | 1代表视频的id
+section_gap = "#" # 3#1-1072%804.png  | 3 代表第三区
 url_prefix = "http://127.0.0.1:5000"  # 第三方访问图片路径的域名? 本地图片存储的位置
 # url_prefix = "https://389852tw96.oicp.vip"  # 第三方访问图片路径的域名? 本地图片存储的位置
 # video_format= ['mp4', 'flv', 'avi', 'wmv', 'mpg', 'mpeg'] # 其他格式还未测试
-path_space_fill_char = '_'   # 例如: 第六章 逻辑回归, 中间有空格, 浏览器无法打开
+# (已解决使用quote方法) path_space_fill_char = '_'   # 例如: 第六章 逻辑回归, 中间有空格, 浏览器无法打开
 frame_name_gap = '-'  # name: 123-66, 其中, 123代表当前帧的帧编号, 66该帧内容帧的位置,即该画面开始的位置
 
 # paddleOCR args
