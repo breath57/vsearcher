@@ -59,15 +59,15 @@ class Video:
     #     self.name = video.name
     #     self.local_path = video.local_path
     #     self.chapter_id = video.chapter_id
-    #     self.kfs = video.getKfs()
+    #     self.kfs = video.getAllKfs()
     @staticmethod
     def create(video):
-        return Video(id=video.id, name=video.name,
-                     local_path=video.local_path,
-                     chapter_id=video.chapter_id,
-                     kfs=[Frame.create(pf) for pf in video.getKfs()],
-                     url=utils.local2url( video.local_path )
-                     )
+        return Video( id=video.id, name=video.name,
+                      local_path=video.local_path,
+                      chapter_id=video.chapter_id,
+                      kfs=[Frame.create(pf) for pf in video.kfs],
+                      url=utils.local2url( video.local_path )
+                      )
 
 
 @dataclass

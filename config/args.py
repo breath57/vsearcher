@@ -1,5 +1,6 @@
 speed_x = 20
 step = "fps"
+search_clear_period_seconds = 60
 # 用线程和进程安全的数据结构, 对OCR的创建进行控制
 
 
@@ -67,7 +68,6 @@ height_multiple_x = 6  # 假设代码框, w/h的比值为 height_multiple_x
 th_max_codeline_num = 7  # 最大代码框的数量, 大于该值判断为代码页
 
 #   th_max_boxes_num = 66  # 所有框的数量不能大于
-
 img_format = "png"  # 图片保存的格式
 img_name_gap = "-"  # 1-1072%804.png | 1代表视频的id
 section_gap = "#" # 3#1-1072%804.png  | 3 代表第三区

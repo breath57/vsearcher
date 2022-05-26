@@ -4,24 +4,32 @@ from typing import List
 import img2pdf
 import json
 import pickle
-import shutil
 import cv2 as cv
 import numpy as np
-
-from .video import Chapter, Video
 from ..config import path
 from ..config import args
 import os
+
+
+def save_object_and_get_path(out_path, o, name=''):
+    name = name or o.name
+    if not os.path.exists(out_path):
+        os.makedirs(out_path, mode=0o777, exist_ok=True)
+    o_path = f'{out_path}\\{name}.pkl'
+    with open(o_path, 'wb') as output_hal:
+        _str = pickle.dumps(o)
+        output_hal.write(_str)
+    return o_path
 
 
 def saveObject(out_path, o, name=''):
     name = name or o.name
     if not os.path.exists(out_path):
         os.makedirs(out_path, mode=0o777, exist_ok=True)
-    output_hal = open(f'{out_path}\\{name}.pkl', 'wb')
-    _str = pickle.dumps(o)
-    output_hal.write(_str)
-    output_hal.close()
+    o_path = f'{out_path}\\{name}.pkl'
+    with open(o_path, 'wb') as output_hal:
+        _str = pickle.dumps(o)
+        output_hal.write(_str)
     return name
 
 
@@ -34,15 +42,15 @@ def readObject(input_path, name):
         return pickle.loads(file.read())
 
 
-def readVideoObject(name) -> Video:
+def readVideoObject(name):
     return readObject(path.RootPath.output_video_object_dir, name)
 
 
-def readChapterObject(name) -> Chapter:
+def readChapterObject(name):
     return readObject(path.RootPath.output_chapter_object_dir, name)
 
 
-def readCourseObject(name) -> Chapter:
+def readCourseObject(name):
     return readObject(path.RootPath.output_course_object_dir, name)
 
 
@@ -131,28 +139,28 @@ def url2local(url):
     return local_path
 
 
-# @WAIT
-def copy_video_by_img_local_path(video_local_path, img_local_path, file_name='v'):
-    """
-    将视频在电脑的位置，拷贝到img_url对应在本地的文件夹中的位置，
-    然后生成视频支持的http访问的url 
-    """
-    # __drive_unified(video_local_path)
-    # __drive_unified(img_local_path)
-    video_format = Path.suffix(video_local_path)
-    # local_img_path = url2local(img_local_path)
-    # img_local_path  /12321.png
-    dest = img_local_path.replace(
-        # @RISKing 如果路径中含有 / 怎么办, 因此应该自定义一个获取文件路径的方法, 兼容问题
-        # @MODIFY
-        # img_local_path.split('\\')[-1]
-        os.path.basename(img_local_path), f'{file_name}{video_format}')
-    if not os.path.exists(dest):
-        shutil.copy(video_local_path, dest)
-    print(f'dest: {dest}')
-    video_url = local2url(dest)
-    print(f'video_url: {video_url}')
-    return video_url
+# # @WAIT
+# def copy_video_by_img_local_path(video_local_path, img_local_path, file_name='v'):
+#     """
+#     将视频在电脑的位置，拷贝到img_url对应在本地的文件夹中的位置，
+#     然后生成视频支持的http访问的url
+#     """
+#     # __drive_unified(video_local_path)
+#     # __drive_unified(img_local_path)
+#     video_format = Path.suffix(video_local_path)
+#     # local_img_path = url2local(img_local_path)
+#     # img_local_path  /12321.png
+#     dest = img_local_path.replace(
+#         # @RISKing 如果路径中含有 / 怎么办, 因此应该自定义一个获取文件路径的方法, 兼容问题
+#         # @MODIFY
+#         # img_local_path.split('\\')[-1]
+#         os.path.basename(img_local_path), f'{file_name}{video_format}')
+#     if not os.path.exists(dest):
+#         shutil.copy(video_local_path, dest)
+#     print(f'dest: {dest}')
+#     video_url = local2url(dest)
+#     print(f'video_url: {video_url}')
+#     return video_url
 
 
 # def __drive_unified(local_path):

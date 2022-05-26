@@ -3,6 +3,9 @@
 import glob
 from .args import Performance as performance_config
 
+
+# @RISK 路径的生成问题, 需要统一用 Path拼接, 不然换个系统就没用了
+
 def getProjectRootPath():
     r = __name__.replace('.', '\\')
     i = __file__.index(r)
@@ -34,8 +37,8 @@ class RootPath:
     # vsearch包的根路径
     vsearch_root_dir = getThisPackageRootPath()
 
-    # 视频文件的根路径
-    video_dir = f'{project_root_dir}\\video'
+    # # 视频文件的根路径
+    # video_dir = f'{project_root_dir}\\video'
 
     # 输出目录的路径
     output_dir = f'{project_root_dir}\\static\\vsearch-output'
