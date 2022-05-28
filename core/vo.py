@@ -1,5 +1,9 @@
 from dataclasses import dataclass
-from . import  utils
+from typing import List
+
+from ..config import args
+from . import utils
+
 
 @dataclass
 class Base:
@@ -11,15 +15,15 @@ class Base:
 
 # @WAIT 通过反射机制，或者继续学习flask
 @dataclass
-class Frame:
+class FrameVO:
     id: int
     name: str
     title: list
-    img_url: str
-    img_local_path: str  # @WAIT 没必要返回
+    img: str
+    # img_local_path: str  # @WAIT 没必要返回
     ms: int
     time: str
-    txts: list  # @WAIT 没必要返回
+    # txts: list  # @WAIT 没必要返回
     boxes: list  # @WAIT 没必要返回
 
     # def draw_boxes(self):
@@ -31,21 +35,28 @@ class Frame:
 
     @staticmethod
     def create(pf):
-        return Frame( id=pf.id, name=pf.name, title=pf.getTitles(), img_url=pf.img_url,
-                      img_local_path=pf.img_local_path, ms=pf.ms, txts=pf.txts,
-                      boxes=pf.boxes, time=utils.msToH_M_S_str( pf.ms ) )
+        return FrameVO(id=pf.id,
+                       name=pf.name,
+                       title=pf.getTitles(args.title_num),
+                       img=pf.img,
+                       #    img_local_path=pf.img_local_path,
+                       ms=pf.ms,
+                       #    txts=pf.txts,
+                       boxes=pf.boxes,
+                       time=utils.msToH_M_S_str(pf.ms))
 
 
 @dataclass
-class Video:
+class VideoVO:
     id: int
     name: str
     local_path: str
     chapter_id: int
-    kfs: list
+    kfs: List[FrameVO]
     url: str
+    img: str
     o_path: str
-    courseware_url: str
+    cw: str
 
     def isEmpty(self):
         return len(self.kfs) == 0
@@ -63,36 +74,52 @@ class Video:
     #     self.local_path = video.local_path
     #     self.chapter_id = video.chapter_id
     #     self.kfs = video.getAllKfs()
+
     @staticmethod
     def create(video):
-        return Video( id=video.id, name=video.name,
-                      local_path=video.local_path,
-                      chapter_id=video.chapter_id,
-                      kfs=[Frame.create(pf) for pf in video.kfs],
-                      url=utils.local2url( video.local_path ),
-                      o_path=video.o_path,
-                      cw=video.courseware_url
-                      )
+        return VideoVO(id=video.id, name=video.name,
+                       local_path=video.local_path,
+                       chapter_id=video.chapter_id,
+                       kfs=[FrameVO.create(pf) for pf in video.kfs],
+                       img=video.kfs[0].img if len(video.kfs) > 0 else None,
+                       url=utils.local2url(video.local_path),
+                       o_path=video.o_path,
+                       cw=video.courseware_url
+                       )
 
 
 @dataclass
-class Chapter:
+class ChapterVO:
     id: int
     name: str
     course_id: int
-    videos: list
+    videos: List[VideoVO]
     o_path: str
 
     def isEmpty(self):
         return len(self.videos) == 0
 
+    @staticmethod
+    def create(chapter):
+        return ChapterVO(id=chapter.id, name=chapter.name,
+                         course_id=chapter.course_id, videos=[
+                             VideoVO.create(v) for v in chapter.videos],
+                         o_path=chapter.o_path)
+
 
 @dataclass
-class Course:
+class CourseVO:
     id: int
     name: str
-    chapters: list
+    chapters: List[ChapterVO]
     o_path: str
 
     def isEmpty(self):
         return len(self.chapters) == 0
+
+    @staticmethod
+    def create(course):
+        return CourseVO(id=course.id, name=course.name,
+                        chapters=[ChapterVO.create(c)
+                                  for c in course.chapters],
+                        o_path=course.o_path)

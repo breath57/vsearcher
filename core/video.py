@@ -16,6 +16,9 @@ import numpy as np
 from paddleocr import PaddleOCR, draw_ocr
 import os
 from enum import Enum
+
+from requests import delete
+from sqlalchemy import false
 # import paddle
 from . import utils, vo
 from ..config import args
@@ -159,7 +162,7 @@ class Searcher:
         self.__setDir(self.output_dir)
 
     @staticmethod
-    def processPfVo(pf: vo.Frame, output_dir, unique_file_name=""):
+    def processPfVo(pf: vo.FrameVO, output_dir, unique_file_name=""):
         """
         功能: 将pf中的img_url更改为搜索结果,并且可提供第三方访问的url
             cls: 就是Search, 代表class, 类名
@@ -170,7 +173,7 @@ class Searcher:
         # @WAIT 程名 + 章节名 + 视频名称 + key
         # print( '需要读取的图片路径' )
         # http://127.0.0.1:5000/static/vsearch-output/videos/pattern_pure_ppt/-0.png'
-        file_path = utils.url2local(pf.img_url)  # url路径转本地路径
+        file_path = utils.url2local(pf.img)  # url路径转本地路径
         frame = utils.cvimread(file_path)
         frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)  # 修正色域为Image读取正常
         frame = draw_ocr(frame, pf.boxes)  # 圈出搜索结果
@@ -184,7 +187,7 @@ class Searcher:
         # print( f"处理过的图片保存路径: {file_path}" )
         im_show.save(file_path)  # 结果图片保存在代码同级文件夹中, (output_dir下更准确)
         img_url = utils.local2url(file_path)
-        pf.img_url = img_url  # 此时的 pf中的img_url为框出搜索结果的图片url
+        pf.img = img_url  # 此时的 pf中的img_url为框出搜索结果的图片url
         # print( f"图片url: {img_url}" )
         return pf
         # 图片保存
@@ -208,7 +211,7 @@ class Searcher:
         :return:
         """
         if not os.path.exists(dir_path):
-            os.mkdir(dir_path, mode=0o777)
+            os.makedirs(dir_path, mode=0o777)
         return dir_path
 
     # @classmethod
@@ -468,7 +471,7 @@ class PaddleFrame:
         return sum([len(s) for s in self.txts])
 
     # @WAIT 将搜索的方法外置
-    def searchByKey(self, key, output_dir, json_dumps=False, vo_process_func=Searcher.processPfVo):
+    def searchByKey(self, key, output_dir, json_dumps=False, vo_process_func=Searcher.processPfVo) -> vo.FrameVO:
         """
         :return [{box1相关信息}, {}, {}  ]= 关键帧的box位置的相关信息
             @WAIT返回True 还是, 返回在具体某个boxes的坐标, 有利于框出来
@@ -498,13 +501,13 @@ class PaddleFrame:
                 # 搜索结果 -> 画ocr
                 # @tag
         # @WAIT 还可以有 keyword, 也就是每页中 又大又长的框框
-        result = vo.Frame(
+        result = vo.FrameVO(
             id=self.id,
-            img_url=self.img_url,
-            img_local_path=self.img_local_path,
+            img=self.img,
+            # img_local_path=self.img_local_path,
             boxes=boxes,
             name=self.name,
-            txts=txts,
+            # txts=txts,
             ms=self.ms,
             time=utils.msToH_M_S_str(self.ms),
             title=self.getTitles(args.title_num),
@@ -533,9 +536,10 @@ class PaddleFrame:
         # @WAIT 将所有路径统一为 / 而不是window下的 \\
         # img_url = img_url.replace('\\', '/') # @MODIFY 修改为统一的
         # print( f"img_url: {img_url}" )
-        self.img_url = img_url
+        self.img = img_url
         self.img_local_path = img_path
         # @RISK 删除属性, 节约持久化需要的内存
+
         del self.frame
         del self.result
 
@@ -922,7 +926,7 @@ class Video(DelAnd2Pickle):
             for i in range(self.section_nums)
         ]  # sections = [ [0, 400], []  ]
 
-    def searchByKey(self, key, output_dir, json_dumps=False):
+    def searchByKey(self, key, output_dir, json_dumps=False) -> vo.VideoVO:
         """
             视频内容的搜索方法: 可以并发搜索
             @RISKED 如果每个分片的内容比较少，并发反而增加时间，但是在配置文件中，已经设置了阈值，也就是最小任务量了，所以不需要担忧
@@ -931,7 +935,8 @@ class Video(DelAnd2Pickle):
 
         def unit(pf: PaddleFrame, key: str):
             r = pf.searchByKey(key, output_dir)
-            if r:
+            if not r.isEmpty():
+                delattr(r, 'boxes')
                 kfs.append(r)
 
         for pf in self.kfs:
@@ -952,9 +957,9 @@ class Video(DelAnd2Pickle):
         # for result in results:
         #     kfs += result
 
-        result = vo.Video(
-            id=self.id, kfs=kfs, name=self.name, local_path=self.local_path, chapter_id=self.chapter_id,
-            o_path=self.o_path, courseware_url=self.courseware_url, url=self.url
+        result = vo.VideoVO(
+            id=self.id, kfs=kfs, img=None, name=self.name, local_path=self.local_path, chapter_id=self.chapter_id,
+            o_path=self.o_path, cw=self.courseware_url, url=self.url
         )
         return utils.json_dumps(result) if json_dumps else result
 
@@ -1378,7 +1383,7 @@ class Chapter(DelAnd2Pickle):
     def __getitem__(self, index):
         return self.videos[index]
 
-    def searchByKey(self, key, output_dir, json_dumps=False):
+    def searchByKey(self, key, output_dir, json_dumps=False) -> vo.ChapterVO:
         """
         :param key:
         :return: r[小节号][帧]
@@ -1415,7 +1420,7 @@ class Chapter(DelAnd2Pickle):
             #     # else:
             #     if not video_vo.isEmpty():
             #         videos.append( video_vo )
-            result = vo.Chapter(
+            result = vo.ChapterVO(
                 id=self.id, videos=videos, name=self.name, course_id=self.course_id, o_path=self.o_path
             )
             return utils.json_dumps(result) if json_dumps else result
@@ -1442,7 +1447,7 @@ class Course(DelAnd2Pickle):
     def __getitem__(self, index):
         return self.chapters[index]
 
-    def searchByKey(self, key, output_dir, json_dumps=False) -> vo.Course:
+    def searchByKey(self, key, output_dir, json_dumps=False) -> vo.CourseVO:
         with ThreadManager.getPoolsExecutor() as executor:
             args = (self.chapters, [key] * len(self.chapters))
             cos = list(executor.map(lambda chapter,
@@ -1458,8 +1463,8 @@ class Course(DelAnd2Pickle):
             #     # else:
             #     if not chapter_vo.isEmpty():
             #         chapters.append( chapter_vo )
-            result = vo.Course(id=self.id, chapters=cos,
-                               name=self.name, o_path=self.o_path)
+            result = vo.CourseVO(id=self.id, chapters=cos,
+                                 name=self.name, o_path=self.o_path)
             return utils.json_dumps(result) if json_dumps else result
 
 
@@ -1478,15 +1483,15 @@ class Assember:
         if not path_dir.is_dir():
             return False
         for item in path_dir.iterdir():
-            if filetype.is_video(item):
+            if item.is_file() and filetype.is_video(str(item)):
                 return True
         return False
 
     @classmethod
     def executeCourse(cls,
-                      course_dir_path, output_dir=RootPath.output_courses_dir, course_id="", dir_name=""
+                      course_dir_path, output_dir=None, course_id="", dir_name=""
                       ) -> Course:
-
+        output_dir = output_dir or RootPath.output_courses_dir
         chapter_dirs = glob.glob(f"{course_dir_path}\\*")
         # 过滤非目录文件
         chapter_dirs = cls.__filter_no_dir(chapter_dirs)
@@ -1508,7 +1513,7 @@ class Assember:
                     output_dir=output_dir,
                     chapter_id=arg[0] + 1,
                     chapter_name=os.path.basename(arg[1]),
-                    course_id=course_id,), enumerate(chapter_dirs))  # arg: index, path
+                    course_id=course_id), enumerate(chapter_dirs))  # arg: index, path
             )
             # chapters = [
             #     Assember.executeChapter(
@@ -1525,14 +1530,14 @@ class Assember:
     @staticmethod
     def executeChapter(
             chapter_dir_path,
-            output_dir=RootPath.output_chapters_dir,
+            output_dir=None,
             chapter_id="",
             chapter_name="",
             course_id="",
     ) -> Chapter:
         # 获取章节目录下的所有视频的路径
         # @RISK 视频类型的过滤器可能有隐藏的bug
-
+        output_dir = output_dir or RootPath.output_chapters_dir
         video_paths = glob.glob(f"{chapter_dir_path}\\*")
         video_paths = Assember.__filter_no_video_file(video_paths)
         chapter_name = chapter_name or os.path.basename(
@@ -1581,25 +1586,25 @@ class Assember:
         )
         return v
 
-    @classmethod
-    def execute(cls, _type, resource_root_path, output_dir='', id="", name="", parent_id=""):
-        # output_object_path = ''
-        r = {}
-        if _type == cls.COURSE:
-            output_dir = output_dir or path.RootPath.output_courses_dir
-            # output_object_path = path.RootPath.output_course_object_dir
-            r = cls.executeCourse(resource_root_path, output_dir, id, name)
-        elif _type == cls.CHAPTER:
-            output_dir = output_dir or path.RootPath.output_chapters_dir
-            # output_object_path = path.RootPath.output_chapter_object_dir
-            r = cls.executeChapter(
-                resource_root_path, output_dir, id, name, parent_id)
-        elif _type == cls.VIDEO:
-            output_dir = output_dir or path.RootPath.output_videos_dir
-            # output_object_path = path.RootPath.output_video_object_dir
-            r = cls.executeVideo(resource_root_path, output_dir,
-                                 video_id=id, chapter_id=parent_id, name=name)
-        return r
+    # @classmethod
+    # def execute(cls, _type, resource_root_path, output_dir=None, id="", name="", parent_id=""):
+    #     # output_object_path = ''
+    #     r = {}
+    #     if _type == cls.COURSE:
+    #         output_dir = output_dir or path.RootPath.output_courses_dir
+    #         # output_object_path = path.RootPath.output_course_object_dir
+    #         r = cls.executeCourse(resource_root_path, output_dir, id, name)
+    #     elif _type == cls.CHAPTER:
+    #         output_dir = output_dir or path.RootPath.output_chapters_dir
+    #         # output_object_path = path.RootPath.output_chapter_object_dir
+    #         r = cls.executeChapter(
+    #             resource_root_path, output_dir, id, name, parent_id)
+    #     elif _type == cls.VIDEO:
+    #         output_dir = output_dir or path.RootPath.output_videos_dir
+    #         # output_object_path = path.RootPath.output_video_object_dir
+    #         r = cls.executeVideo(resource_root_path, output_dir,
+    #                              video_id=id, chapter_id=parent_id, name=name)
+    #     return r
 
     @staticmethod
     def set_step(step='fps', speed_x=1):

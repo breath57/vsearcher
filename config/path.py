@@ -43,7 +43,7 @@ class RootPath:
     # vsearch包的根路径
     vsearch_root_dir = getThisPackageRootPath()
 
-    # # 视频文件的根路径
+    #  视频文件的根路径
     # video_dir = f'{project_root_dir}\\video'
 
     # 输出目录的路径
@@ -93,6 +93,7 @@ class RootPath:
         cls.output_courses_dir = cls.join_output_dir('courses')
         cls.output_chapters_dir = cls.join_output_dir('chapters')
         cls.output_videos_dir = cls.join_output_dir('videos')
+        cls.output_search_result_dir = cls.join_output_dir('search-result')
 
     url_prefix_local_path = project_root_dir
 

@@ -1,6 +1,9 @@
+from pathlib import Path
+from app.libs.exception import NotFound
 from .config.path import RootPath
 
-from .core.video import Assember, Video, Chapter, Course, Searcher
+from .core.video import Assember, DelAnd2Pickle, Video, Chapter, Course, Searcher
+from .core import vo
 
 
 class VSearcher:
@@ -34,17 +37,39 @@ class VSearcher:
         Assember.set_step(step=step, speed_x=speed_x)
 
     @classmethod
-    def executeVideo(cls, video_file_path) -> Video:
-        return Assember.executeVideo(video_path=video_file_path)
+    def executeVideo(cls, video_file_path) -> vo.VideoVO:
+        video = Assember.executeVideo(video_path=video_file_path)
+        return vo.VideoVO.create(video=video)
 
     @classmethod
-    def executeChapter(cls, chapter_dir_path) -> Chapter:
-        return Assember.executeChapter(chapter_dir_path=chapter_dir_path)
+    def executeChapter(cls, chapter_dir_path) -> vo.ChapterVO:
+        chapter = Assember.executeChapter(chapter_dir_path=chapter_dir_path)
+        return vo.ChapterVO.create(chapter)
 
     @classmethod
-    def executeCourse(cls, course_dir_path) -> Course:
-        return Assember.executeCourse(course_dir_path=course_dir_path)
+    def executeCourse(cls, course_dir_path) -> vo.CourseVO:
+        course = Assember.executeCourse(course_dir_path=course_dir_path)
+        return vo.CourseVO.create(course)
 
+    @classmethod
+    def loadResource(cls, o_path):
+        if not Path(o_path).exists():
+            raise NotFound('o_path对象不存在!')
+        o = DelAnd2Pickle.loadPickle(o_path)
+        if isinstance(o, Video):
+            return vo.VideoVO.create(o)
+        elif isinstance(o, Chapter):
+            return vo.ChapterVO.create(o)
+        elif isinstance(o, Course):
+            return vo.CourseVO.create(o)
+
+    @classmethod
+    def releaseResource(cls, o_path):
+        """ 释放o_path对应的pickle对象对应的所有存储资源 """
+        o = DelAnd2Pickle.loadPickle(o_path=o_path)
+        o.releaseResource()
+
+    @classmethod
     def search(cls, o_or_path, key):
         return Searcher(o_or_path=o_or_path).search(key)
 
