@@ -1,6 +1,6 @@
 speed_x = 20
 step = "fps"
-search_clear_period_seconds = 60
+search_clear_period_seconds = 120  # seconds
 # 用线程和进程安全的数据结构, 对OCR的创建进行控制
 
 
@@ -25,10 +25,10 @@ class Performance:
     # 处理一个章节的每个视频的线程|进程 数量 | 总线程(进程)数 = 章节线程 * 视频线程
     th_chapter_multiple_nums = 1
     # @RISK 目前只能使用线程, 不能使用多进程 # [thread, process, other] thread: 多线程 |  process: 多进程 | other : 单线程
-    video_process_mode = 'thread' # @WAIT 多进程有问题
-    th_video_multiple_nums = 1  # 处理一个视频分配的线程|进程数量 |　总线程(进程)数 = 视频线程
+    video_process_mode = 'thread'  # @WAIT 多进程问题
+    th_video_multiple_nums = 2  # 处理一个视频分配的线程|进程数量 |　总线程(进程)数 = 视频线程
 
-    cpu_threads = 5  # paddleOCR参数  # 或许对于GPU版本来说没有用
+    cpu_threads = 10  # paddleOCR参数  # 或许对于GPU版本来说没有用
     # 目前有: [paddle: 手机轻量级, paddlev3: 16.3M中英] 具体位置为: resource/model/ocr/{$paddle_dir_name}
     paddle_dir_name = 'paddle'
     ocr_num = 1  # 创建的OCR的个数 = 进程数量 * 线程数量 # WAIT 让所有的线程共享
@@ -70,7 +70,7 @@ th_max_codeline_num = 7  # 最大代码框的数量, 大于该值判断为代码
 #   th_max_boxes_num = 66  # 所有框的数量不能大于
 img_format = "png"  # 图片保存的格式
 img_name_gap = "-"  # 1-1072%804.png | 1代表视频的id
-section_gap = "#" # 3#1-1072%804.png  | 3 代表第三区
+section_gap = "#"  # 3#1-1072%804.png  | 3 代表第三区
 url_prefix = "http://127.0.0.1:5000"  # 第三方访问图片路径的域名? 本地图片存储的位置
 # url_prefix = "https://389852tw96.oicp.vip"  # 第三方访问图片路径的域名? 本地图片存储的位置
 # video_format= ['mp4', 'flv', 'avi', 'wmv', 'mpg', 'mpeg'] # 其他格式还未测试

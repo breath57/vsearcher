@@ -1,14 +1,24 @@
+import os
 from pathlib import Path
-from app.libs.exception import NotFound
+import shutil
+from .config import args, path
 from .config.path import RootPath
-
 from .core.video import Assember, DelAnd2Pickle, Video, Chapter, Course, Searcher
 from .core import vo
 
 
+class Config:
+
+    args = args
+    path = path
+    RootPath = RootPath
+
+
 class VSearcher:
 
-    def __init__(self):
+    config: Config = Config
+
+    def __init__(self, url_prefix, domain_url, step, speed_x):
         # 模仿学习那种参数
         # self.config = Config()
         pass
@@ -54,7 +64,7 @@ class VSearcher:
     @classmethod
     def loadResource(cls, o_path):
         if not Path(o_path).exists():
-            raise NotFound('o_path对象不存在!')
+            raise ValueError('o_path不存在')
         o = DelAnd2Pickle.loadPickle(o_path)
         if isinstance(o, Video):
             return vo.VideoVO.create(o)
@@ -73,6 +83,11 @@ class VSearcher:
     def search(cls, o_or_path, key):
         return Searcher(o_or_path=o_or_path).search(key)
 
+    @classmethod
+    def releaseByOutputDir(cls, output_dir):
+        """ 释放处理产生的文件： 1. 注释文件 2.视频文件 3.图片文件 4. 课件 @WAIT（或许实时生成比较好，就是get的时候进行获取文件） """
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir, ignore_errors=True)
 
 # class Config(dict):
 #     """Works exactly like a dict but provides ways to fill it from files

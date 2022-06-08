@@ -1,3 +1,4 @@
+from codecs import ignore_errors
 import pickle
 import threading
 
@@ -18,7 +19,7 @@ import os
 from enum import Enum
 
 from requests import delete
-from sqlalchemy import false
+from sqlalchemy import false, true
 # import paddle
 from . import utils, vo
 from ..config import args
@@ -118,7 +119,9 @@ class OCR:
     def ocr_safe(self, **kwargs):
         i = random.randint(0, self.ocr_num - 1)
         self.locks[i].acquire()
+        print('----------开始OCR----')
         result = self.ocrs[i].ocr(**kwargs)
+        print('----------结束OCR----')
         self.locks[i].release()
         return result
     # def ocr_safe(self, **kwargs):
@@ -839,6 +842,7 @@ class Video(DelAnd2Pickle):
         # 复制视频
         self.local_path = str(Path(output_dir).joinpath(
             Path(video_path).name))  # 视频存放的目录
+
         shutil.copy(video_path, self.local_path)  # 复制到目录下
         self.url = utils.local2url(self.local_path)  # 第三方访问url
 
@@ -856,7 +860,7 @@ class Video(DelAnd2Pickle):
         self.width = self.cap.get(cv.CAP_PROP_FRAME_WIDTH)
         self.height = self.cap.get(cv.CAP_PROP_FRAME_HEIGHT)
         self.frame_counts = int(self.cap.get(cv.CAP_PROP_FRAME_COUNT))
-        del self.cap
+        del self.cap  # @MODIFY 与cap无关
 
         Video.th_min_box_height = args.update_th_min_box_height(self.height)
 
@@ -870,7 +874,8 @@ class Video(DelAnd2Pickle):
         self.sections_kfs = [KeyFrames()
                              for i in range(self.section_nums)]  # 初始化每个分区的kfs
         self.caps = [cv.VideoCapture(video_path) for i in range(
-            self.section_nums)]  # 每个分区一个cap不冲突
+            self.section_nums)]  # 每个分区一个cap不冲突 应对多线程
+        # self.caps = [self.cap] * self.section_nums  # 每个分区一个cap不冲突
 
         print('多分区PaddleOCR 初始化完成 ! ')
 
@@ -892,7 +897,9 @@ class Video(DelAnd2Pickle):
         # for kfs in self.sections_kfs:
         #     self.sections_kfs[section_id] += kfs.getList()
         # self.sections_kfs  # 还可以用在搜索里进行并发
-        del self.caps  # 释放
+        # del self.caps  # 释放
+        # del self.cap
+        del self.caps
         # if run:
         #     self.__run()
         self.toPickle()  # 保存为对象
@@ -1378,7 +1385,7 @@ class Chapter(DelAnd2Pickle):
         self.name = name
         self.course_id = course_id
         self.videos = videos  # @RISK 如何保证视频的有序性， 这样才能够保证搜索结果的有序性，（可以根据id排序，实现一次规整化处理）
-        self.toPickle()
+        # self.toPickle()
 
     def __getitem__(self, index):
         return self.videos[index]
@@ -1442,7 +1449,7 @@ class Course(DelAnd2Pickle):
         self.id = id
         self.name = name
         self.chapters = chapters
-        self.toPickle()
+        # self.toPickle()
 
     def __getitem__(self, index):
         return self.chapters[index]
@@ -1464,7 +1471,7 @@ class Course(DelAnd2Pickle):
             #     if not chapter_vo.isEmpty():
             #         chapters.append( chapter_vo )
             result = vo.CourseVO(id=self.id, chapters=cos,
-                                 name=self.name, o_path=self.o_path)
+                                 name=self.name, output_dir=self.o_path)
             return utils.json_dumps(result) if json_dumps else result
 
 

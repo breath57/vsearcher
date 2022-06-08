@@ -120,9 +120,9 @@ def local2url(local_path):
     """
         http://127.0.0.1/xxx -> http://服务器域名/xxx
     """
-    source_path = local_path.replace(
-        path.RootPath.url_prefix_local_path, '').replace('\\', '/')
-    url = f'{args.url_prefix}{parse.quote(source_path)}'
+    source_path = local_path.replace(  # 作用： http://服务器域名/xxx  -> 得到内容 /xxx
+        path.RootPath.url_prefix_local_path, '').replace('\\', '/')  # 获取路径 排除域名，域名不能进行编码否则容易出问题
+    url = f'{args.url_prefix}{source_path}'
     # print(
     #     f'project_root_dir: {path.RootPath.project_root_dir} img_url_prefix: {args.img_url_prefix}  ')
     return url  # @MODIFY 为了应对本地路径中含有空白字符和转义字符, 导致url路径不正确
@@ -132,7 +132,7 @@ def url2local(url):
     """
         http://服务器域名/xxx -> F://a/bc/d
     """
-    url = parse.unquote(url)  # @MODIFY 为了应对url路径中含有空白字符和转义字符
+    # url = parse.unquote(url)  # @MODIFY 为了应对url路径中含有空白字符和转义字符
     # @WAIT 是否有必要兼容win 还是全局 统一/
     local_path = url.replace(
         args.url_prefix, path.RootPath.url_prefix_local_path)

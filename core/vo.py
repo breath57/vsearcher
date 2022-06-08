@@ -20,10 +20,10 @@ class FrameVO:
     name: str
     title: list
     img: str
-    # img_local_path: str  # @WAIT 没必要返回
+    img_local_path: str  # @WAIT 没必要返回
     ms: int
     time: str
-    # txts: list  # @WAIT 没必要返回
+    txts: list  # @WAIT 没必要返回 | 全都返回，数据裁剪不应该这里做
     boxes: list  # @WAIT 没必要返回
 
     # def draw_boxes(self):
@@ -39,9 +39,9 @@ class FrameVO:
                        name=pf.name,
                        title=pf.getTitles(args.title_num),
                        img=pf.img,
-                       #    img_local_path=pf.img_local_path,
+                        img_local_path=pf.img_local_path,
                        ms=pf.ms,
-                       #    txts=pf.txts,
+                       txts=pf.txts,
                        boxes=pf.boxes,
                        time=utils.msToH_M_S_str(pf.ms))
 
@@ -57,6 +57,7 @@ class VideoVO:
     img: str
     o_path: str
     cw: str
+    output_dir: str
 
     def isEmpty(self):
         return len(self.kfs) == 0
@@ -84,6 +85,7 @@ class VideoVO:
                        img=video.kfs[0].img if len(video.kfs) > 0 else None,
                        url=utils.local2url(video.local_path),
                        o_path=video.o_path,
+                       output_dir=video.output_dir,
                        cw=video.courseware_url
                        )
 
@@ -94,7 +96,8 @@ class ChapterVO:
     name: str
     course_id: int
     videos: List[VideoVO]
-    o_path: str
+    # o_path: str
+    output_dir: str
 
     def isEmpty(self):
         return len(self.videos) == 0
@@ -104,7 +107,7 @@ class ChapterVO:
         return ChapterVO(id=chapter.id, name=chapter.name,
                          course_id=chapter.course_id, videos=[
                              VideoVO.create(v) for v in chapter.videos],
-                         o_path=chapter.o_path)
+                         output_dir=chapter.output_dir)
 
 
 @dataclass
@@ -112,7 +115,7 @@ class CourseVO:
     id: int
     name: str
     chapters: List[ChapterVO]
-    o_path: str
+    output_dir: str
 
     def isEmpty(self):
         return len(self.chapters) == 0
@@ -122,4 +125,4 @@ class CourseVO:
         return CourseVO(id=course.id, name=course.name,
                         chapters=[ChapterVO.create(c)
                                   for c in course.chapters],
-                        o_path=course.o_path)
+                        output_dir=course.output_dir)
