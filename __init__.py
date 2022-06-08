@@ -47,8 +47,10 @@ class VSearcher:
         Assember.set_step(step=step, speed_x=speed_x)
 
     @classmethod
-    def executeVideo(cls, video_file_path) -> vo.VideoVO:
-        video = Assember.executeVideo(video_path=video_file_path)
+    def executeVideo(cls, video_file_path, video_name=None) -> vo.VideoVO:
+        """ video_name: if None 则为 video_file_path 所示的名字 """
+        video = Assember.executeVideo(
+            video_path=video_file_path, name=video_name)
         return vo.VideoVO.create(video=video)
 
     @classmethod

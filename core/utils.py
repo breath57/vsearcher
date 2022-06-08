@@ -192,7 +192,7 @@ def get_unique_str() -> str:
     """
         含有时序信息的名唯一名称
     """
-    return str(int(time.time()))
+    return f'{time.time()}'
 
 
 def imgs2pdf(sorted_paths: List[str], output_dir=None, file_name='temp') -> str:

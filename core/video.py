@@ -1,4 +1,5 @@
 from codecs import ignore_errors
+from multiprocessing import Lock
 import pickle
 import threading
 
@@ -823,7 +824,7 @@ class Video(DelAnd2Pickle):
         # if not video_path:
         #     raise FileExistsError('Please correct video path!')
         if not name:
-            self.name = Path(video_path).stem
+            self.name = Path(output_dir).stem
         else:
             self.name = name
         self.courseware_path = None
@@ -1487,7 +1488,7 @@ class Assember:
 
     @classmethod
     def executeCourse(cls,
-                      course_dir_path, output_dir=None, course_id="", dir_name=""
+                      course_dir_path, output_dir=None, course_id="", course_name=""
                       ) -> Course:
         with utils.EvaluateTime(f'course[ {Path(course_dir_path).name} ]'):
             output_dir = output_dir or RootPath.output_courses_dir
@@ -1498,12 +1499,13 @@ class Assember:
             chapter_dirs = [
                 chapter_dir for chapter_dir in chapter_dirs if cls.includeVideo(chapter_dir)]
 
-            dir_name = dir_name or os.path.basename(course_dir_path)  # 获取目录名
+            
 
             # 初始化 输出目录
-            output_dir = str(Path(output_dir).joinpath(dir_name))
+            output_dir = str(Path(output_dir).joinpath(os.path.basename(course_dir_path)  ))
             # @modified 修改了路径
             output_dir = Assember._setDir(output_dir)
+            course_name = course_name or os.path.basename(output_dir) # 获取目录名
             with ThreadManager.getPoolsExecutor(mode=args.Performance.course_process_mode,
                                                 max_workers=args.Performance.th_course_multiple_nums) as executor:
                 chapters = list(
@@ -1524,7 +1526,7 @@ class Assember:
                 #     )
                 #     for i, dir_path in enumerate( chapter_dirs )
                 # ]
-                return Course(id=course_id, output_dir=output_dir, name=dir_name, chapters=chapters)
+                return Course(id=course_id, output_dir=output_dir, name=course_name, chapters=chapters)
 
     @staticmethod
     def executeChapter(
@@ -1540,12 +1542,12 @@ class Assember:
             output_dir = output_dir or RootPath.output_chapters_dir
             video_paths = glob.glob(f"{chapter_dir_path}\\*")
             video_paths = Assember.__filter_no_video_file(video_paths)
-            chapter_name = chapter_name or os.path.basename(
-                chapter_dir_path)  # 获取目录名
-            output_dir = output_dir + "\\" + chapter_name
+            output_dir = output_dir + "\\" + os.path.basename(
+                chapter_dir_path)
             # print(f'chapter_output: {output_dir} | video_output: {output_dir}' )
             # @modified 修改了路径
-            output_dir = Assember._setDir(output_dir)
+            output_dir = Assember._setDir(output_dir) # 可能会更新目录名称
+            chapter_name = chapter_name or os.path.basename(output_dir)
 
             with ThreadManager.getPoolsExecutor(mode=args.Performance.chapter_process_mode,
                                                 max_workers=args.Performance.th_chapter_multiple_nums) as executor:
@@ -1575,7 +1577,7 @@ class Assember:
             # print( f'RootPath.output_videos_dir: {RootPath.output_videos_dir}' )
 
             output_dir = str(Path(output_dir).joinpath(
-                (name or Path(video_path).stem)))
+                (name or Path(video_path).stem)))  # F:\Document\VSCode\Projects\courseware-abstract\vs-api\app\static\vsearch-output\videos\13-12 本章小节
 
             # print( f"output_dir: {output_dir}" )
             # print(f'video_path: {video_path}')
@@ -1622,19 +1624,28 @@ class Assember:
     def __filter_no_video_file(paths):
         return list(filter(lambda p: os.path.isfile(p) and filetype.is_video(p), paths))
 
-    @staticmethod
-    def _setDir(dir_path):
+    set_dir_lock = Lock()
+
+    @classmethod
+    def _setDir(cls, dir_path, duplicate_mode='rename'):
         """
         线程安全
         作用: 设定存放处理结果的目录
-        如果目录不存在, 就创建目录; 存在就清空目录下的文件
+        如果目录不存在, 就创建目录; 存在就 清空目录下的文件 or 重命名
         :param dir_path:
+        :duplicate_mode  'reset': 重置目录  'rename': 重新命名和创建
         :return:
         """
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path, mode=0o777, exist_ok=True)
-            # os.mkdir( dir_path )
-        else:
-            shutil.rmtree(dir_path, ignore_errors=True)
-            os.mkdir(dir_path)
-        return dir_path
+        with cls.set_dir_lock:
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path, mode=0o777, exist_ok=True)
+                # os.mkdir( dir_path )
+            else:  # 已经存在的逻辑
+                if duplicate_mode == 'reset':
+                    shutil.rmtree(dir_path, ignore_errors=True)
+                    os.mkdir(dir_path)
+                elif duplicate_mode == 'rename':
+                    count = len(glob.glob(f'{dir_path}*'))
+                    dir_path = f'{dir_path}_{count}'
+                    os.mkdir(dir_path)
+            return dir_path
