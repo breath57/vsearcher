@@ -2,6 +2,7 @@ speed_x = 20
 step = "fps"
 search_clear_period_seconds = 120  # seconds
 # 用线程和进程安全的数据结构, 对OCR的创建进行控制
+default_clear_period_seconds = 120
 
 
 class Performance:

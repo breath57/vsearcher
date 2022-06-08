@@ -1,3 +1,5 @@
+import shutil
+from threading import Thread
 from urllib import parse
 from pathlib import Path
 import time
@@ -228,3 +230,35 @@ def calculate_runtime(func, *args, **kwargs):
     func(*args, **kwargs)
     end_time = time.time()
     print(f'运行时间: {end_time - start_time}')
+
+
+def timeIntervalClear(del_path, search_clear_period_seconds=args.default_clear_period_seconds) -> Thread:
+    """ 定时删除某个目录或者问价，构建一个删除队列 """
+
+    def temp(del_path):
+        time.sleep(search_clear_period_seconds)
+        print(f'即将删除:{del_path}')
+        if(Path(del_path).is_file()):
+            os.remove(del_path)
+        else:
+            shutil.rmtree(del_path, ignore_errors=True)
+    Thread(target=temp, args=(del_path,)).start()
+
+
+class EvaluateTime:
+    def __init__(self, note=None):
+        self.start_time = 0
+        self.end_time = 0
+        self.note = note
+
+    def __enter__(self):
+        self.start_time = time.time()
+
+    def __exit__(self, exc_type, exc_value, trace):
+        self.end_time = time.time()
+        self.__calculate_time()
+
+    def __calculate_time(self):
+        print("==================== Evaluate Time =====================")
+        print(f'{f"note: {self.note}" if self.note else ""} | spend time: {self.end_time - self.start_time}')
+        print("========================================================")

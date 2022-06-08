@@ -195,16 +195,6 @@ class Searcher:
         return pf
         # 图片保存
 
-    def timeintevalClear(self, search_clear_period_seconds=args.search_clear_period_seconds) -> Thread:
-        """ 定时删除搜索结果，构建一个删除队列 """
-
-        def temp(dir_path):
-            time.sleep(search_clear_period_seconds)
-            print(f'即将删除:{dir_path}')
-            shutil.rmtree(dir_path, ignore_errors=True)
-
-        threading.Thread(target=temp, args=(self.output_dir,)).start()
-
     @staticmethod
     def __setDir(dir_path: str):
         """
@@ -240,7 +230,8 @@ class Searcher:
 
     def search(self, key, json_dumps=False):
         # 定时删除搜索结果
-        self.timeintevalClear()
+        utils.timeIntervalClear(
+            self.output_dir, args.search_clear_period_seconds)
         return self.o.searchByKey(key=key, output_dir=self.output_dir, json_dumps=json_dumps)
 
 
@@ -1498,41 +1489,42 @@ class Assember:
     def executeCourse(cls,
                       course_dir_path, output_dir=None, course_id="", dir_name=""
                       ) -> Course:
-        output_dir = output_dir or RootPath.output_courses_dir
-        chapter_dirs = glob.glob(f"{course_dir_path}\\*")
-        # 过滤非目录文件
-        chapter_dirs = cls.__filter_no_dir(chapter_dirs)
-        # 过滤没有视频的章节
-        chapter_dirs = [
-            chapter_dir for chapter_dir in chapter_dirs if cls.includeVideo(chapter_dir)]
+        with utils.EvaluateTime(f'course[ {Path(course_dir_path).name} ]'):
+            output_dir = output_dir or RootPath.output_courses_dir
+            chapter_dirs = glob.glob(f"{course_dir_path}\\*")
+            # 过滤非目录文件
+            chapter_dirs = cls.__filter_no_dir(chapter_dirs)
+            # 过滤没有视频的章节
+            chapter_dirs = [
+                chapter_dir for chapter_dir in chapter_dirs if cls.includeVideo(chapter_dir)]
 
-        dir_name = dir_name or os.path.basename(course_dir_path)  # 获取目录名
+            dir_name = dir_name or os.path.basename(course_dir_path)  # 获取目录名
 
-        # 初始化 输出目录
-        output_dir = str(Path(output_dir).joinpath(dir_name))
-        # @modified 修改了路径
-        output_dir = Assember._setDir(output_dir)
-        with ThreadManager.getPoolsExecutor(mode=args.Performance.course_process_mode,
-                                            max_workers=args.Performance.th_course_multiple_nums) as executor:
-            chapters = list(
-                executor.map(lambda arg: cls.executeChapter(
-                    chapter_dir_path=arg[1],
-                    output_dir=output_dir,
-                    chapter_id=arg[0] + 1,
-                    chapter_name=os.path.basename(arg[1]),
-                    course_id=course_id), enumerate(chapter_dirs))  # arg: index, path
-            )
-            # chapters = [
-            #     Assember.executeChapter(
-            #         chapter_path=dir_path,
-            #         output_dir=output_dir,
-            #         chapter_id=i + 1,
-            #         chapter_name=os.path.basename( dir_path ),
-            #         course_id=course_id,
-            #     )
-            #     for i, dir_path in enumerate( chapter_dirs )
-            # ]
-            return Course(id=course_id, output_dir=output_dir, name=dir_name, chapters=chapters)
+            # 初始化 输出目录
+            output_dir = str(Path(output_dir).joinpath(dir_name))
+            # @modified 修改了路径
+            output_dir = Assember._setDir(output_dir)
+            with ThreadManager.getPoolsExecutor(mode=args.Performance.course_process_mode,
+                                                max_workers=args.Performance.th_course_multiple_nums) as executor:
+                chapters = list(
+                    executor.map(lambda arg: cls.executeChapter(
+                        chapter_dir_path=arg[1],
+                        output_dir=output_dir,
+                        chapter_id=arg[0] + 1,
+                        chapter_name=os.path.basename(arg[1]),
+                        course_id=course_id), enumerate(chapter_dirs))  # arg: index, path
+                )
+                # chapters = [
+                #     Assember.executeChapter(
+                #         chapter_path=dir_path,
+                #         output_dir=output_dir,
+                #         chapter_id=i + 1,
+                #         chapter_name=os.path.basename( dir_path ),
+                #         course_id=course_id,
+                #     )
+                #     for i, dir_path in enumerate( chapter_dirs )
+                # ]
+                return Course(id=course_id, output_dir=output_dir, name=dir_name, chapters=chapters)
 
     @staticmethod
     def executeChapter(
@@ -1544,29 +1536,30 @@ class Assember:
     ) -> Chapter:
         # 获取章节目录下的所有视频的路径
         # @RISK 视频类型的过滤器可能有隐藏的bug
-        output_dir = output_dir or RootPath.output_chapters_dir
-        video_paths = glob.glob(f"{chapter_dir_path}\\*")
-        video_paths = Assember.__filter_no_video_file(video_paths)
-        chapter_name = chapter_name or os.path.basename(
-            chapter_dir_path)  # 获取目录名
-        output_dir = output_dir + "\\" + chapter_name
-        # print(f'chapter_output: {output_dir} | video_output: {output_dir}' )
-        # @modified 修改了路径
-        output_dir = Assember._setDir(output_dir)
+        with utils.EvaluateTime(f'chapter[ {course_id or Path(chapter_dir_path).parent.name} / {Path(chapter_dir_path).name} ]'):
+            output_dir = output_dir or RootPath.output_chapters_dir
+            video_paths = glob.glob(f"{chapter_dir_path}\\*")
+            video_paths = Assember.__filter_no_video_file(video_paths)
+            chapter_name = chapter_name or os.path.basename(
+                chapter_dir_path)  # 获取目录名
+            output_dir = output_dir + "\\" + chapter_name
+            # print(f'chapter_output: {output_dir} | video_output: {output_dir}' )
+            # @modified 修改了路径
+            output_dir = Assember._setDir(output_dir)
 
-        with ThreadManager.getPoolsExecutor(mode=args.Performance.chapter_process_mode,
-                                            max_workers=args.Performance.th_chapter_multiple_nums) as executor:
-            videos = list(
-                executor.map(lambda arg: Assember.executeVideo(
-                    video_path=arg[1],
-                    output_dir=output_dir,
-                    video_id=arg[0] + 1,
-                    chapter_id=chapter_id,
-                ), enumerate(video_paths))
-            )
-            return Chapter(
-                id=chapter_id, output_dir=output_dir, name=chapter_name, course_id=course_id, videos=videos
-            )
+            with ThreadManager.getPoolsExecutor(mode=args.Performance.chapter_process_mode,
+                                                max_workers=args.Performance.th_chapter_multiple_nums) as executor:
+                videos = list(
+                    executor.map(lambda arg: Assember.executeVideo(
+                        video_path=arg[1],
+                        output_dir=output_dir,
+                        video_id=arg[0] + 1,
+                        chapter_id=chapter_id,
+                    ), enumerate(video_paths))
+                )
+                return Chapter(
+                    id=chapter_id, output_dir=output_dir, name=chapter_name, course_id=course_id, videos=videos
+                )
 
     @staticmethod
     def executeVideo(
@@ -1576,22 +1569,26 @@ class Assember:
             chapter_id="",
             name=""
     ) -> Video:
-        output_dir = output_dir or RootPath.output_videos_dir
-        # print( f'RootPath.output_videos_dir: {RootPath.output_videos_dir}' )
-        output_dir = str(Path(output_dir).joinpath(
-            (name or Path(video_path).stem)))
-        # print( f"output_dir: {output_dir}" )
-        # print(f'video_path: {video_path}')
-        # @modified 修改了路径
-        output_dir = Assember._setDir(output_dir)
-        v = Video(
-            video_path=video_path,
-            output_dir=output_dir,
-            video_id=video_id,
-            chapter_id=chapter_id,
-            name=name,
-        )
-        return v
+
+        with utils.EvaluateTime(f'video[ {chapter_id or Path(video_path).parent.name} / {Path(video_path).name} ]'):
+            output_dir = output_dir or RootPath.output_videos_dir
+            # print( f'RootPath.output_videos_dir: {RootPath.output_videos_dir}' )
+
+            output_dir = str(Path(output_dir).joinpath(
+                (name or Path(video_path).stem)))
+
+            # print( f"output_dir: {output_dir}" )
+            # print(f'video_path: {video_path}')
+            # @modified 修改了路径
+            output_dir = Assember._setDir(output_dir)
+            v = Video(
+                video_path=video_path,
+                output_dir=output_dir,
+                video_id=video_id,
+                chapter_id=chapter_id,
+                name=name,
+            )
+            return v
 
     # @classmethod
     # def execute(cls, _type, resource_root_path, output_dir=None, id="", name="", parent_id=""):
