@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 
-from ..config import args
+from .._config import args
 from . import utils
 
 
@@ -35,15 +35,15 @@ class FrameVO:
 
     @staticmethod
     def create(pf):
-        return FrameVO(id=pf.id,
-                       name=pf.name,
-                       title=pf.getTitles(args.title_num),
-                       img=pf.img,
+        return FrameVO( id=pf.id,
+                        name=pf.name,
+                        title=pf.getTitles( args.title_num ),
+                        img=pf.img,
                         img_local_path=pf.img_local_path,
-                       ms=pf.ms,
-                       txts=pf.txts,
-                       boxes=pf.boxes,
-                       time=utils.msToH_M_S_str(pf.ms))
+                        ms=pf.ms,
+                        txts=pf.txts,
+                        boxes=pf.boxes,
+                        time=utils.msToH_M_S_str( pf.ms ) )
 
 
 @dataclass
@@ -78,16 +78,16 @@ class VideoVO:
 
     @staticmethod
     def create(video):
-        return VideoVO(id=video.id, name=video.name,
-                       local_path=video.local_path,
-                       chapter_id=video.chapter_id,
-                       kfs=[FrameVO.create(pf) for pf in video.kfs],
-                       img=video.kfs[0].img if len(video.kfs) > 0 else None,
-                       url=utils.local2url(video.local_path),
-                       o_path=video.o_path,
-                       output_dir=video.output_dir,
-                       cw=video.courseware_url
-                       )
+        return VideoVO( id=video.id, name=video.name,
+                        local_path=video.local_path,
+                        chapter_id=video.chapter_id,
+                        kfs=[FrameVO.create(pf) for pf in video.kfs],
+                        img=video.kfs[0].img if len(video.kfs) > 0 else None,
+                        url=utils.local2url( video.local_path ),
+                        o_path=video.o_path,
+                        output_dir=video.output_dir,
+                        cw=video.courseware_url
+                        )
 
 
 @dataclass

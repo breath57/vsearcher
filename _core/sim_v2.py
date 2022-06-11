@@ -1,20 +1,19 @@
-import pandas as pd
 import warnings
+from collections import Counter
+
 # from functools import cached_property
 import jieba
 import numpy as np
-from collections import Counter
+
+from .._config import args
 
 #  字符串还是文本列表, 或者OCR已经算分词了吗
 # 该版本 输入: 为list  或者 str都可以
 
-from ..config import path
-from ..config import args
-
-f_path = f'{path.RootPath.step_word_path}\\{args.stop_word_file}'
-result = pd.read_csv(f_path, sep='\n\r', names=['word'], encoding='gbk')
-stop_word_set = set(result['word'].values)
-
+# f_path = f'{path.RootPath.step_word_path}\\{args.stop_word_file}'
+# result = pd.read_csv(f_path, sep='\n\r', names=['word'], encoding='gbk')
+# stop_word_set = set(result['word'].values)
+stop_word_set = args.stop_word_set
 
 class TextSimilarity(object):
 

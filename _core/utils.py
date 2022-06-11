@@ -1,6 +1,5 @@
 import shutil
 from threading import Thread
-from urllib import parse
 from pathlib import Path
 import time
 from typing import List
@@ -9,8 +8,8 @@ import json
 import pickle
 import cv2 as cv
 import numpy as np
-from ..config import path
-from ..config import args
+from .._config import path
+from .._config import args
 import os
 
 
@@ -46,15 +45,15 @@ def readObject(input_path, name):
 
 
 def readVideoObject(name):
-    return readObject(path.RootPath.output_video_object_dir, name)
+    return readObject( path.RootPath.output_video_object_dir, name )
 
 
 def readChapterObject(name):
-    return readObject(path.RootPath.output_chapter_object_dir, name)
+    return readObject( path.RootPath.output_chapter_object_dir, name )
 
 
 def readCourseObject(name):
-    return readObject(path.RootPath.output_course_object_dir, name)
+    return readObject( path.RootPath.output_course_object_dir, name )
 
 
 def cvimread(path):
@@ -69,7 +68,7 @@ def cvimwrite(path, img):
     保存路径包含中文的图片
     """
     # cv2.imencode(保存格式, 保存图片)[1].tofile(保存路径)
-    cv.imencode(f'.{args.img_format}', img)[1].tofile(path)
+    cv.imencode(f'.{args.img_format}', img )[1].tofile( path )
 
 
 def __json_dumps_default_func(o):
@@ -122,9 +121,17 @@ def local2url(local_path):
     """
         http://127.0.0.1/xxx -> http://服务器域名/xxx
     """
-    source_path = local_path.replace(  # 作用： http://服务器域名/xxx  -> 得到内容 /xxx
-        path.RootPath.url_prefix_local_path, '').replace('\\', '/')  # 获取路径 排除域名，域名不能进行编码否则容易出问题
-    url = f'{args.url_prefix}{source_path}'
+    # source_path = local_path.replace(  # 作用： http://服务器域名/xxx  -> 得到内容 /xxx
+    #     path.RootPath.static_folder_dir, '').replace( '\\', '/' )  # 获取路径 排除域名，域名不能进行编码否则容易出问题
+    local_path = str(Path(local_path))\
+        .replace(path.RootPath.static_folder_dir_prefix, '')
+
+    # a/b/c /c
+    # a/b/c
+    if local_path[0] in ['/', "\\"]:
+        local_path = local_path[1:]
+    url = f'{args.url_prefix}/{local_path}'.replace("\\",'/')
+    # print(f'url: {url}')
     # print(
     #     f'project_root_dir: {path.RootPath.project_root_dir} img_url_prefix: {args.img_url_prefix}  ')
     return url  # @MODIFY 为了应对本地路径中含有空白字符和转义字符, 导致url路径不正确
@@ -132,42 +139,12 @@ def local2url(local_path):
 
 def url2local(url):
     """
-        http://服务器域名/xxx -> F://a/bc/d
+        http://服务器域名/xxx ->  {static_prefix}/xxx
     """
-    # url = parse.unquote(url)  # @MODIFY 为了应对url路径中含有空白字符和转义字符
-    # @WAIT 是否有必要兼容win 还是全局 统一/
     local_path = url.replace(
-        args.url_prefix, path.RootPath.url_prefix_local_path)
+        args.url_prefix + '/', "") #  http://服务器域名/xxx  ->  xxx
+    local_path = str(Path(path.RootPath.static_folder_dir_prefix).joinpath(local_path)) # xxx -> {static_prefix}/xxx
     return local_path
-
-
-# # @WAIT
-# def copy_video_by_img_local_path(video_local_path, img_local_path, file_name='v'):
-#     """
-#     将视频在电脑的位置，拷贝到img_url对应在本地的文件夹中的位置，
-#     然后生成视频支持的http访问的url
-#     """
-#     # __drive_unified(video_local_path)
-#     # __drive_unified(img_local_path)
-#     video_format = Path.suffix(video_local_path)
-#     # local_img_path = url2local(img_local_path)
-#     # img_local_path  /12321.png
-#     dest = img_local_path.replace(
-#         # @RISKing 如果路径中含有 / 怎么办, 因此应该自定义一个获取文件路径的方法, 兼容问题
-#         # @MODIFY
-#         # img_local_path.split('\\')[-1]
-#         os.path.basename(img_local_path), f'{file_name}{video_format}')
-#     if not os.path.exists(dest):
-#         shutil.copy(video_local_path, dest)
-#     print(f'dest: {dest}')
-#     video_url = local2url(dest)
-#     print(f'video_url: {video_url}')
-#     return video_url
-
-
-# def __drive_unified(local_path):
-#     local_path[0] = str.upper(local_path[0])
-
 
 def glob_sort(paths, regex='(\d+)'):
     """

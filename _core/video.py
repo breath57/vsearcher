@@ -1,34 +1,28 @@
-from codecs import ignore_errors
-from multiprocessing import Lock
-import pickle
-import threading
-
-from PIL import Image
-import random
-from concurrent import futures
-from pathlib import Path
-import time
-from typing import List
-from black import out
-import filetype
-import shutil
 import glob
-import cv2 as cv
-import numpy as np
-from paddleocr import PaddleOCR, draw_ocr
 import os
+import pickle
+import random
+import shutil
+import time
+from concurrent import futures
 from enum import Enum
+from multiprocessing import Lock
+from pathlib import Path
+from typing import List
 
-from requests import delete
-from sqlalchemy import false, true
+import cv2 as cv
+import filetype
+import numpy as np
+import paddle
+from PIL import Image
+from paddleocr import PaddleOCR, draw_ocr
+
 # import paddle
 from . import utils, vo
-from ..config import args
 from .sim_v2 import TextSimilarity
-from ..config.path import RootPath
-
-from ..config import path
-import paddle
+from .._config import args
+from .._config import path
+from .._config.path import RootPath
 
 if args.Performance.use_gpu:
     print('启用GPU............')
@@ -61,7 +55,7 @@ del self.cap self.result 将 paddleOCR置出 节约持久化
 #         pass
 
 
-from threading import Semaphore, Thread
+from threading import Semaphore
 
 
 class ThreadManager:
@@ -86,7 +80,6 @@ class ThreadManager:
             return futures.ThreadPoolExecutor(max_workers=1)
         # return futures.ProcessPoolExecutor()
 
-
 class OCR:
     paddle_ocr_init_args = {
         "det_model_dir": RootPath.det_model_dir,
@@ -101,6 +94,7 @@ class OCR:
     '''
         可以根据情况动态增加线程
     '''
+
 
     def __init__(self, ocr_num=args.Performance.ocr_num, ocr_load=args.Performance.ocr_load):
         '''
@@ -134,9 +128,8 @@ class OCR:
 
 # from threading import S
 # 现在考虑如何让一个线程并发两个线程, 幸好两
-
-
 # @RISK 每次导入都会执行一次
+print("可以吗")
 my_ocr = OCR()
 
 

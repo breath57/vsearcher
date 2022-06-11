@@ -1,4 +1,4 @@
-speed_x = 20
+speed_x = 1
 step = "fps"
 search_clear_period_seconds = 120  # seconds
 # 用线程和进程安全的数据结构, 对OCR的创建进行控制
@@ -27,9 +27,9 @@ class Performance:
     th_chapter_multiple_nums = 1
     # @RISK 目前只能使用线程, 不能使用多进程 # [thread, process, other] thread: 多线程 |  process: 多进程 | other : 单线程
     video_process_mode = 'thread'  # @WAIT 多进程问题
-    th_video_multiple_nums = 2  # 处理一个视频分配的线程|进程数量 |　总线程(进程)数 = 视频线程
+    th_video_multiple_nums = 1  # 处理一个视频分配的线程|进程数量 |　总线程(进程)数 = 视频线程
 
-    cpu_threads = 10  # paddleOCR参数  # 或许对于GPU版本来说没有用
+    cpu_threads = 20  # paddleOCR参数  # 或许对于GPU版本来说没有用
     # 目前有: [paddle: 手机轻量级, paddlev3: 16.3M中英] 具体位置为: resource/model/ocr/{$paddle_dir_name}
     paddle_dir_name = 'paddle'
     ocr_num = 1  # 创建的OCR的个数 = 进程数量 * 线程数量 # WAIT 让所有的线程共享
@@ -106,3 +106,46 @@ def update_th_min_box_height(video_height):
         th_min_box_height = video_height * int(th_min_box_height) / 1080
         return th_min_box_height
     return th_min_box_height
+
+
+stop_word_set = set([
+'--',
+'-',
+'?',
+'<',
+'>',
+'!',
+',',
+'.',
+'"',
+"/",
+"~",
+"`",
+"-",
+"=",
+"+",
+"(",
+")",
+"*",
+":",
+";",
+"－－",
+"－",
+"、",
+"。",
+"“",
+"”",
+"《",
+"》",
+"（",
+"）",
+"【",
+"】",
+"[",
+"]",
+"！",
+"，",
+"：",
+"；",
+"？",
+])

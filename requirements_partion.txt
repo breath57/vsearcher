@@ -1,5 +1,0 @@
-filetype
-jieba
-numpy
-opencv_python
-paddleocr
