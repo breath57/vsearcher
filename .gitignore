@@ -1,0 +1,6 @@
+*.pyc
+.vscode
+.python-version
+.idea/
+*.pytest_cache/
+*.md
