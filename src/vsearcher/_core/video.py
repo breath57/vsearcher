@@ -492,10 +492,10 @@ class PaddleFrame:
         result = vo.FrameVO(
             id=self.id,
             img=self.img,
-            # img_local_path=self.img_local_path,
+            img_local_path=self.img_local_path,
             boxes=boxes,
             name=self.name,
-            # txts=txts,
+            txts=txts,
             ms=self.ms,
             time=utils.msToH_M_S_str(self.ms),
             title=self.getTitles(args.title_num),
@@ -951,7 +951,7 @@ class Video(DelAnd2Pickle):
 
         result = vo.VideoVO(
             id=self.id, kfs=kfs, img=None, name=self.name, local_path=self.local_path, chapter_id=self.chapter_id,
-            o_path=self.o_path, cw=self.courseware_url, url=self.url
+            o_path=self.o_path, cw=self.courseware_url, url=self.url,output_dir=self.output_dir
         )
         return utils.json_dumps(result) if json_dumps else result
 

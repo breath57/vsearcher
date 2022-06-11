@@ -27,7 +27,7 @@ pip install -i https://test.pypi.org/simple/ vsearcher=={version}
 ```
 
 2. 使用案例
-```python
+```py
 from vsearcher import VSearcher
 
 def test():

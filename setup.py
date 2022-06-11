@@ -9,14 +9,14 @@ with open( "README.md", "r", encoding="utf-8" ) as fh:
 
 setuptools.setup(
     name="vsearcher",
-    version="0.2.5",
+    version="0.2.6",
     author="breath",
     author_email="1498408920@qq.com",
     maintainer="breath",
     description="支持视频内容检索和课件自动生成的库",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://gitee.com/breath57/vsearch/tree/v1.2.1/",
+    url="https://gitee.com/breath57/vsearch/tree/0.2.6-pypi/",
     keywords=["video", "search", "courseware", "ocr"],
     project_urls={
         "Bug Tracker": "https://github.com/pypa/sampleproject/issues",
