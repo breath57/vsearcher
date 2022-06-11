@@ -16,10 +16,10 @@ setuptools.setup(
     description="支持视频内容检索和课件自动生成的库",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://gitee.com/breath57/vsearch/tree/0.2.6-pypi/",
+    url="https://gitee.com/breath57/vsearch/tree/0.2.6-pypi",
     keywords=["video", "search", "courseware", "ocr"],
     project_urls={
-        "Bug Tracker": "https://github.com/pypa/sampleproject/issues",
+        # "Bug Tracker": "bug连接",
     },
     classifiers=[
         "Programming Language :: Python :: 3",
