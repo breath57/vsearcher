@@ -935,11 +935,16 @@ class Video(DelAnd2Pickle):
         '''
         self.process_frame_sum_counts = self.frame_counts // self.step  # 一个视频需要处理的视频帧
 
-        self.section_nums = self.thread_nums = self.process_frame_sum_counts // args.Performance.th_mul_thread_on_frame_counts  # 区间大小， 每个线程处理的任务量
+        # 符合多线程的启动阈值，划分的区间的数量
+        section_nums = self.process_frame_sum_counts // args.Performance.th_mul_thread_on_frame_counts
+        self.section_nums = self.thread_nums = min(
+            section_nums, args.Performance.th_video_multiple_nums)  # 实际分区和分配的线程数量
 
-        self.gap = args.Performance.th_mul_thread_on_frame_counts * self.step
-        if self.section_nums == 0:
-            self.thread_nums = self.section_nums = 1  # 代表使用多线程
+        # self.gap = (self.process_frame_sum_counts // self.section_nums) * self.step
+        self.gap = self.frame_counts // self.section_nums
+        # self.gap = args.Performance.th_mul_thread_on_frame_counts * self.step
+        if self.section_nums == 0:  # @NOTING ？
+            self.thread_nums = self.section_nums = 1  # 代表使用多线程 ？
         print(f'v: {self.name} 需要遍历的帧为： {self.process_frame_sum_counts}')
         print(f'分区数量（线程数量）：{self.section_nums}')
         # @WAIT 帧id的取值是从0开始的吗, 是的话需要　self.frame_counts - 1
@@ -1373,7 +1378,7 @@ class Video(DelAnd2Pickle):
                 frame_id = int(current_pos)
                 frame_ms = self.caps[section_id].get(cv.CAP_PROP_POS_MSEC)
                 print(
-                    f'第 {section_id} 区 {section}: 进度: {frame_id - low_pos}/{hight_pos - low_pos}')
+                    f'第 {section_id} 区 {section}: 进度: {frame_id - low_pos}/{hight_pos - low_pos} / {self.frame_counts}')
                 # 增加一层, 框框数太多, 为代码也, 框框的高度大小, 代码也
                 self.__section_iter_func(
                     pf=PaddleFrame(
