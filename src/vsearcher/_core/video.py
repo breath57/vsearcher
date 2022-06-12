@@ -1,3 +1,4 @@
+from threading import Semaphore, Thread
 import glob
 import os
 import pickle
@@ -26,12 +27,18 @@ from .._config.path import RootPath
 
 if args.Performance.use_gpu:
     print('启用GPU............')
-
     os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-    # @RISK 判断设备是否存在 再设置
+    # @RISK 判断设备是否存在 再设
     if paddle.get_device() != 'cpu':
         paddle.set_device(args.Performance.gpu_name)
+    print(f'cuda version: {paddle.get_cudnn_version()}')
     print(f'current use device: {args.Performance.gpu_name}')
+else:
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+    paddle.set_device('cpu')
+    print(f'current use device: {paddle.get_device()} ')
+
+
 # paddle.set_device('gpu:0')
 
 """
@@ -53,9 +60,6 @@ del self.cap self.result 将 paddleOCR置出 节约持久化
 #     @abstractmethod
 #     def searchByKey(self, key):
 #         pass
-
-
-from threading import Semaphore
 
 
 class ThreadManager:
@@ -80,6 +84,31 @@ class ThreadManager:
             return futures.ThreadPoolExecutor(max_workers=1)
         # return futures.ProcessPoolExecutor()
 
+# class CvCap:
+#     def __init__(self,video_path, ocr_num=args.Performance.ocr_num):
+#         '''
+#         ocr_num: 创建的OCR对象的个数
+#         ocr_load: 每个OCR对象, 同时处理的线程的最大数量
+#         '''
+#         print("CAP对象创建成功!")
+#         self.ocr_num = ocr_num
+#         # self.ocrs = [PaddleOCR( **self.paddle_ocr_init_args )
+#         #              for i in range( ocr_num )]
+#         cv.VideoCapture()
+#         self.caps = [cv.VideoCapture(video_path) for i in range( ocr_num)]
+#         self.locks = [Lock() for i in range(ocr_num)]
+
+#     def get_safe(self, **kwargs):
+#         i = random.randint(0, self.ocr_num - 1)
+#         self.locks[i].acquire()
+#         print('----------获取cap----')
+#         result = self.caps[i]
+
+#         print('----------结束OCR----')
+#         self.locks[i].release()
+#         return result
+
+
 class OCR:
     paddle_ocr_init_args = {
         "det_model_dir": RootPath.det_model_dir,
@@ -94,7 +123,6 @@ class OCR:
     '''
         可以根据情况动态增加线程
     '''
-
 
     def __init__(self, ocr_num=args.Performance.ocr_num, ocr_load=args.Performance.ocr_load):
         '''
@@ -125,6 +153,7 @@ class OCR:
     #     result = self.ocrs[0].ocr( **kwargs )
     #     # self.locks[i].release()
     #     return result
+
 
 # from threading import S
 # 现在考虑如何让一个线程并发两个线程, 幸好两
@@ -804,7 +833,6 @@ class Video(DelAnd2Pickle):
     #     paths =
     #     for pf in self.sections_kfs[section_id].getList():
     #         PaddleFrame().img_local_path
-
     th_min_box_height = ''
 
     def __init__(self, video_path, output_dir, video_id, chapter_id, name=""):
@@ -840,12 +868,11 @@ class Video(DelAnd2Pickle):
             self.pre_id = f"{chapter_id}.{self.id}"
 
         # 初始化Opencv相关对象
-        self.cap = cv.VideoCapture(video_path)  # 获取指定路径的视频对象
+        self.cap = cv.VideoCapture(self.local_path)  # 获取指定路径的视频对象
         self.fps = int(self.cap.get(cv.CAP_PROP_FPS))
         self.width = self.cap.get(cv.CAP_PROP_FRAME_WIDTH)
         self.height = self.cap.get(cv.CAP_PROP_FRAME_HEIGHT)
         self.frame_counts = int(self.cap.get(cv.CAP_PROP_FRAME_COUNT))
-        del self.cap  # @MODIFY 与cap无关
 
         Video.th_min_box_height = args.update_th_min_box_height(self.height)
 
@@ -859,16 +886,16 @@ class Video(DelAnd2Pickle):
         self.sections_kfs = [KeyFrames()
                              for i in range(self.section_nums)]  # 初始化每个分区的kfs
         self.caps = [cv.VideoCapture(video_path) for i in range(
-            self.section_nums)]  # 每个分区一个cap不冲突 应对多线程
-        # self.caps = [self.cap] * self.section_nums  # 每个分区一个cap不冲突
-
-        print('多分区PaddleOCR 初始化完成 ! ')
+            self.section_nums)]  # @MODIFY 会有阻塞问题，所以注释了，每个分区一个cap不冲突, 具体为： set帧的读取位置的冲突， 应对多线程
+        # self.caps = [self.cap] * self.section_nums  # 每个分区同一个cap将错乱
+        print('多分区初始化完成 ! ')
 
         if self.fps > 0:  # 有些垃圾的视频文件, 没有内容, 导致 除0的报错
             self.total_time_ms = self.frame_counts / self.fps * 1000
 
             self.old_frames = [None] * self.section_nums
             self.__run()  # 运行完成产出关键帧
+
             # 合并各个分区的关键帧
             self.kfs = [kf for s_kfs in self.sections_kfs for kf in s_kfs]
             self.courseware_url = self.__generate_courseware(
@@ -884,7 +911,11 @@ class Video(DelAnd2Pickle):
         # self.sections_kfs  # 还可以用在搜索里进行并发
         # del self.caps  # 释放
         # del self.cap
+        [cap.release() for cap in self.caps]
         del self.caps
+        self.cap.release()
+        del self.cap
+
         # if run:
         #     self.__run()
         self.toPickle()  # 保存为对象
@@ -951,7 +982,7 @@ class Video(DelAnd2Pickle):
 
         result = vo.VideoVO(
             id=self.id, kfs=kfs, img=None, name=self.name, local_path=self.local_path, chapter_id=self.chapter_id,
-            o_path=self.o_path, cw=self.courseware_url, url=self.url,output_dir=self.output_dir
+            o_path=self.o_path, cw=self.courseware_url, url=self.url, output_dir=self.output_dir
         )
         return utils.json_dumps(result) if json_dumps else result
 
@@ -1221,7 +1252,9 @@ class Video(DelAnd2Pickle):
         #     print(arg)
         # arg：section, section_id:  [0, 400], 1
         with self.__getPoolsExecutor() as executor:  # 应该在这里传入各种各样的需要阐述才对, 比如KFS,OCR等资源, 而不是通过ID号来获取
-            args = (self.sections, list(range(self.section_nums)))
+            # @MODIFY 其中lock是为了防止cap.read()多线程，访问同一个视频，偶然会发生阻塞问题
+            args = (self.sections, list(range(self.section_nums)),
+                    [Lock()] * self.section_nums)
             executor.map(self.__process_section, *args)
 
         # 打印 帧列表名字
@@ -1304,7 +1337,7 @@ class Video(DelAnd2Pickle):
     def get_all_section_kfs_size(self):
         return sum([len(kfs) for kfs in self.sections_kfs])
 
-    def __process_section(self, section: tuple, section_id: int):
+    def __process_section(self, section: tuple, section_id: int, capReadLock: Lock):
         """ 
         功能： 处理一个section中的内容 | 区间去重
          """
@@ -1330,7 +1363,11 @@ class Video(DelAnd2Pickle):
                 # self.caps[section_id].set( cv.CAP_PROP_POS_FRAMES, hight_pos )
                 # is_out_of_index = True
                 return
+            capReadLock.acquire()
+            print(f"section: {section_id} | cap.read() ")
             ret, frame = self.caps[section_id].read()
+            print(f"section: {section_id} | end read ")
+            capReadLock.release()
             if ret:
                 # 当前位置id帧编号, base-0开始编号， @NOTING　为什么　这里需要　－１　呢， 回退到上一帧吗？
                 frame_id = int(current_pos)
@@ -1492,13 +1529,12 @@ class Assember:
             chapter_dirs = [
                 chapter_dir for chapter_dir in chapter_dirs if cls.includeVideo(chapter_dir)]
 
-            
-
             # 初始化 输出目录
-            output_dir = str(Path(output_dir).joinpath(os.path.basename(course_dir_path)  ))
+            output_dir = str(Path(output_dir).joinpath(
+                os.path.basename(course_dir_path)))
             # @modified 修改了路径
             output_dir = Assember._setDir(output_dir)
-            course_name = course_name or os.path.basename(output_dir) # 获取目录名
+            course_name = course_name or os.path.basename(output_dir)  # 获取目录名
             with ThreadManager.getPoolsExecutor(mode=args.Performance.course_process_mode,
                                                 max_workers=args.Performance.th_course_multiple_nums) as executor:
                 chapters = list(
@@ -1539,7 +1575,7 @@ class Assember:
                 chapter_dir_path)
             # print(f'chapter_output: {output_dir} | video_output: {output_dir}' )
             # @modified 修改了路径
-            output_dir = Assember._setDir(output_dir) # 可能会更新目录名称
+            output_dir = Assember._setDir(output_dir)  # 可能会更新目录名称
             chapter_name = chapter_name or os.path.basename(output_dir)
 
             with ThreadManager.getPoolsExecutor(mode=args.Performance.chapter_process_mode,
@@ -1584,26 +1620,6 @@ class Assember:
                 name=name,
             )
             return v
-
-    # @classmethod
-    # def execute(cls, _type, resource_root_path, output_dir=None, id="", name="", parent_id=""):
-    #     # output_object_path = ''
-    #     r = {}
-    #     if _type == cls.COURSE:
-    #         output_dir = output_dir or path.RootPath.output_courses_dir
-    #         # output_object_path = path.RootPath.output_course_object_dir
-    #         r = cls.executeCourse(resource_root_path, output_dir, id, name)
-    #     elif _type == cls.CHAPTER:
-    #         output_dir = output_dir or path.RootPath.output_chapters_dir
-    #         # output_object_path = path.RootPath.output_chapter_object_dir
-    #         r = cls.executeChapter(
-    #             resource_root_path, output_dir, id, name, parent_id)
-    #     elif _type == cls.VIDEO:
-    #         output_dir = output_dir or path.RootPath.output_videos_dir
-    #         # output_object_path = path.RootPath.output_video_object_dir
-    #         r = cls.executeVideo(resource_root_path, output_dir,
-    #                              video_id=id, chapter_id=parent_id, name=name)
-    #     return r
 
     @staticmethod
     def set_step(step='fps', speed_x=1):

@@ -4,12 +4,12 @@ vsearcher
 """
 import setuptools
 
-with open( "README.md", "r", encoding="utf-8" ) as fh:
+with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="vsearcher",
-    version="0.2.6",
+    version="0.2.7",
     author="breath",
     author_email="1498408920@qq.com",
     maintainer="breath",
@@ -42,4 +42,3 @@ setuptools.setup(
     ]
 
 )
-
