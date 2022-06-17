@@ -21,13 +21,18 @@
 * 无重复
 
 ### 使用:
-1. 安装 
+1. 安装
+
+> 步骤 1
+
+安装paddle，[点击查看方法](https://www.paddlepaddle.org.cn/)，支持CPU和GPU的方式
+
+> 步骤 2
 ```
 pip install -i https://test.pypi.org/simple/ vsearcher=={version}
 ```
-
 2. 使用案例
-```python
+```py
 from vsearcher import VSearcher
 
 def test():
@@ -43,3 +48,26 @@ def test():
 if __name__ == '__main__':
     test()
 ```
+
+3. 问题
+
+> 在linux环境下可能出现cv2相关的异常问题
+
+解决方案 1： 安装如下包
+```
+pip install opencv-contrib-python
+pip install opencv-python-headless
+pip install openpyxl
+```
+
+若执行方案1之后还有报错，则执行如下命令即可
+```
+pip uninstall opencv-contrib-python
+pip uninstall opencv-python-headless
+pip uninstall openpyxl
+
+pip install opencv-contrib-python
+pip install opencv-python-headless
+pip install openpyxl
+```
+
