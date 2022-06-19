@@ -20,12 +20,19 @@
 * 人像的讲解
 * 无重复
 
-### 使用:
+### 快速使用:
 1. 安装
 
-> 步骤 1
+> 步骤 1 安装Paddle框架
+选择CPU或GPU其一安装即可
 
-安装paddle，[点击查看方法](https://www.paddlepaddle.org.cn/)，支持CPU和GPU的方式
+**cpu版:**
+```
+python3 -m pip install paddlepaddle==2.3.0 -i https://mirror.baidu.com/pypi/simple
+```
+**GPU版** (通常需要安装CUDA等显卡适配软件)
+
+不同环境的安装方式不同, [点击查看详情](https://www.paddlepaddle.org.cn/)
 
 > 步骤 2
 ```
@@ -37,7 +44,7 @@ from vsearcher import VSearcher
 
 def test():
     VSearcher.init(static_folder="app/static", output_dir='vs-output') # 设置输出文件夹
-    video_path = "./test.mp4" # 视频文件路径
+    video_path = "./test.mp4" # 视频文件路径：请填入真实的文件可访问视频路径
     video = VSearcher.executeVideo(video_file_path=video_path) # 处理视频 生成 注释文件
     courseware = video.cw # 获取生成的课件的路径
     result = VSearcher.search(video, '关键字') # 视频检索
@@ -51,7 +58,7 @@ if __name__ == '__main__':
 
 3. 问题
 
-> 在linux环境下可能出现cv2相关的异常问题
+> 3.1 在linux环境下可能出现cv2相关的异常问题
 
 解决方案 1： 安装如下包
 ```
@@ -71,3 +78,17 @@ pip install opencv-python-headless
 pip install openpyxl
 ```
 
+
+> 3.2 出现如下异常信息
+```
+_message.Message._CheckCalledFromGeneratedFile()
+TypeError: Descriptors cannot not be created directly.
+If this call came from a _pb2.py file, your generated code is out of date and must be regenerated with protoc >= 3.19.0.
+If you cannot immediately regenerate your protos, some other possible workarounds are:
+ 1. Downgrade the protobuf package to 3.20.x or lower.
+ 2. Set PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python (but this will use pure-Python parsing and will be much slower).
+```
+解决
+```
+pip3 install protobuf==3.20
+```
