@@ -12,7 +12,6 @@ src/vsearcher/_config/__init__.py
 src/vsearcher/_config/args.py
 src/vsearcher/_config/path.py
 src/vsearcher/_core/__init__.py
-src/vsearcher/_core/sim_v1.py
 src/vsearcher/_core/sim_v2.py
 src/vsearcher/_core/utils.py
 src/vsearcher/_core/video.py

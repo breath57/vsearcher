@@ -208,7 +208,10 @@ class Searcher:
 
         # 用时间标识每次产出的图片的唯一性, 符合url的唯一定位特点
         file_path = str(
-            Path(f'{output_dir}\\_{int( time.time_ns() ) % 100000000}_.{args.img_format}'))
+            Path(output_dir).joinpath(
+                f'{int( time.time_ns() ) % 100000000}_.{args.img_format}'  # 文件名
+            )
+        )
 
         # print( f"处理过的图片保存路径: {file_path}" )
         im_show.save(file_path)  # 结果图片保存在代码同级文件夹中, (output_dir下更准确)
@@ -540,7 +543,10 @@ class PaddleFrame:
     #     self.out_path = out_path
 
     def save(self):
-        img_path = f"{self.output_path}\\{self.name}.{args.img_format}"
+        img_path = os.path.join(
+            self.output_path,
+            f"{self.name}.{args.img_format}"
+        )
         # print( f'img_path: {img_path}' )
         # @note 中文路径图片保存
         cv.imencode(f".{args.img_format}", self.frame)[1].tofile(img_path)
@@ -1528,7 +1534,7 @@ class Assember:
                       ) -> Course:
         with utils.EvaluateTime(f'course[ {Path(course_dir_path).name} ]'):
             output_dir = output_dir or RootPath.output_courses_dir
-            chapter_dirs = glob.glob(f"{course_dir_path}\\*")
+            chapter_dirs = glob.glob(f"{course_dir_path}/*")
             # 过滤非目录文件
             chapter_dirs = cls.__filter_no_dir(chapter_dirs)
             # 过滤没有视频的章节
@@ -1575,10 +1581,12 @@ class Assember:
         # @RISK 视频类型的过滤器可能有隐藏的bug
         with utils.EvaluateTime(f'chapter[ {course_id or Path(chapter_dir_path).parent.name} / {Path(chapter_dir_path).name} ]'):
             output_dir = output_dir or RootPath.output_chapters_dir
-            video_paths = glob.glob(f"{chapter_dir_path}\\*")
+            video_paths = glob.glob(f"{chapter_dir_path}/*")
             video_paths = Assember.__filter_no_video_file(video_paths)
-            output_dir = output_dir + "\\" + os.path.basename(
-                chapter_dir_path)
+            output_dir = os.path.join(
+                output_dir,
+                os.path.basename(chapter_dir_path)
+            )
             # print(f'chapter_output: {output_dir} | video_output: {output_dir}' )
             # @modified 修改了路径
             output_dir = Assember._setDir(output_dir)  # 可能会更新目录名称

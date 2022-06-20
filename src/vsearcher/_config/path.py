@@ -25,8 +25,6 @@ def getProjectRootPath(_name_):
     # return str(path)
 
 
-
-
 def getThisPackageRootPath():
     return ''
 
@@ -53,7 +51,8 @@ class RootPath:
     project_root_dir = ""
 
     # 输出目录的路径
-    output_dir = str(Path(project_root_dir).joinpath('static').joinpath('vsearch-output'))
+    output_dir = str(Path(project_root_dir).joinpath(
+        'static').joinpath('vsearch-output'))
 
     # 搜索结果输出目录
     output_search_result_dir = str(Path(output_dir).joinpath('search-result'))
@@ -69,7 +68,7 @@ class RootPath:
     output_videos_dir = str(Path(output_dir).joinpath('videos'))
 
     # paddleocr 文字检测 和 文字分类模型 | 最新版可以自行去git的paddleocr查看, 将此处的路径末尾改名字即可自动下载
-    det_model_dir, rec_model_dir = None, None # 导入训练好的机器学习模型路径
+    det_model_dir, rec_model_dir = None, None  # 导入训练好的机器学习模型路径
 
     # # 停用词的目录
     # step_word_path = f'{_resource_dir}\\step_word'
@@ -77,19 +76,20 @@ class RootPath:
     @classmethod
     def set_model_dir(cls, dir_path):
         """ dir_path: 项目相对路径 """
-        result = glob.glob( f'{dir_path}/*det*' )
-        if len( result ) == 0 or len(glob.glob(f'{result[0]}/*.pdmodel')) == 0: # 判断是否真的存在模型文件
-            print( f'路径: {dir_path} |  没有det模型文件, 将使用默认的模型文件' )
+        result = glob.glob(f'{dir_path}/*det*')
+        # 判断是否真的存在模型文件
+        if len(result) == 0 or len(glob.glob(f'{result[0]}/*.pdmodel')) == 0:
+            print(f'路径: {dir_path} |  没有det模型文件, 将使用默认的模型文件')
         else:
             print(f'使用的检测模型为: {Path(result[0]).stem}')
             cls.det_model_dir = result[0]
 
-
-        result = glob.glob( f'{dir_path}/*rec*' )
-        if len( result ) == 0 or len(glob.glob(f'{result[0]}/*.pdmodel')) == 0: # 判断是否真的存在模型文件
-            print( f'路径: {dir_path} |  没有rec模型文件, 将使用默认的模型文件' )
+        result = glob.glob(f'{dir_path}/*rec*')
+        # 判断是否真的存在模型文件
+        if len(result) == 0 or len(glob.glob(f'{result[0]}/*.pdmodel')) == 0:
+            print(f'路径: {dir_path} |  没有rec模型文件, 将使用默认的模型文件')
         else:
-            print( f'使用的识别模型为: {Path( result[0] ).stem}' )
+            print(f'使用的识别模型为: {Path( result[0] ).stem}')
             cls.rec_model_dir = result[0]
 
     @classmethod
@@ -103,17 +103,15 @@ class RootPath:
     #     print( f'项目根目录: {RootPath.project_root_dir}' )
     #     print( '-----------------------------------' )
 
-
-
     @classmethod
     def set_output_dir(cls, relative_static_folder_path: str = ""):
         """
-             relative_project_dir_path: project_dir\\{relative_project_dir_path}
+             relative_project_dir_path: project_dir/{relative_project_dir_path}
         """
-        if relative_static_folder_path[0] in ['/', '\\']: # 为了避免变为F:/a/b的绝对路径
+        if relative_static_folder_path[0] in ['/', '\\']:  # 为了避免变为F:/a/b的绝对路径
             relative_static_folder_path = relative_static_folder_path[1:]
         cls.output_dir = str(
-            Path( cls.static_folder_dir ).joinpath( relative_static_folder_path ))
+            Path(cls.static_folder_dir).joinpath(relative_static_folder_path))
         print(f'output_dir: {cls.output_dir}')
         # 与output_dir有关的所有路径都需要重置
         cls.output_courses_dir = cls.join_output_dir('courses')
@@ -121,8 +119,9 @@ class RootPath:
         cls.output_videos_dir = cls.join_output_dir('videos')
         cls.output_search_result_dir = cls.join_output_dir('search-result')
 
-    static_folder_dir = str(Path(project_root_dir).joinpath("static")) # 静态文件夹路径, 默认值
-    static_folder_dir_prefix = "" # 静态文件夹的前缀 a/c/static -> a/c
+    static_folder_dir = str(
+        Path(project_root_dir).joinpath("static"))  # 静态文件夹路径, 默认值
+    static_folder_dir_prefix = ""  # 静态文件夹的前缀 a/c/static -> a/c
     # | 作用: 用于锁定url 例如: a/c/e.png -> url: http://xxx/a/c/e.png 但是 static_url为 http://xxx/c/e.png才能访问
     # | 此时就有用了
 

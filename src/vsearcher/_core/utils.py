@@ -17,7 +17,7 @@ def save_object_and_get_path(out_path, o, name=''):
     name = name or o.name
     if not os.path.exists(out_path):
         os.makedirs(out_path, mode=0o777, exist_ok=True)
-    o_path = f'{out_path}\\{name}.pkl'
+    o_path = f'{Path(out_path).joinpath(name)}.pkl'
     with open(o_path, 'wb') as output_hal:
         _str = pickle.dumps(o)
         output_hal.write(_str)
@@ -28,7 +28,7 @@ def saveObject(out_path, o, name=''):
     name = name or o.name
     if not os.path.exists(out_path):
         os.makedirs(out_path, mode=0o777, exist_ok=True)
-    o_path = f'{out_path}\\{name}.pkl'
+    o_path = f'{Path(out_path).joinpath(name)}.pkl'
     with open(o_path, 'wb') as output_hal:
         _str = pickle.dumps(o)
         output_hal.write(_str)
@@ -45,15 +45,15 @@ def readObject(input_path, name):
 
 
 def readVideoObject(name):
-    return readObject( path.RootPath.output_video_object_dir, name )
+    return readObject(path.RootPath.output_video_object_dir, name)
 
 
 def readChapterObject(name):
-    return readObject( path.RootPath.output_chapter_object_dir, name )
+    return readObject(path.RootPath.output_chapter_object_dir, name)
 
 
 def readCourseObject(name):
-    return readObject( path.RootPath.output_course_object_dir, name )
+    return readObject(path.RootPath.output_course_object_dir, name)
 
 
 def cvimread(path):
@@ -68,7 +68,7 @@ def cvimwrite(path, img):
     保存路径包含中文的图片
     """
     # cv2.imencode(保存格式, 保存图片)[1].tofile(保存路径)
-    cv.imencode(f'.{args.img_format}', img )[1].tofile( path )
+    cv.imencode(f'.{args.img_format}', img)[1].tofile(path)
 
 
 def __json_dumps_default_func(o):
@@ -130,7 +130,7 @@ def local2url(local_path):
     # a/b/c
     if local_path[0] in ['/', "\\"]:
         local_path = local_path[1:]
-    url = f'{args.url_prefix}/{local_path}'.replace("\\",'/')
+    url = f'{args.url_prefix}/{local_path}'.replace("\\", '/')
     # print(f'url: {url}')
     # print(
     #     f'project_root_dir: {path.RootPath.project_root_dir} img_url_prefix: {args.img_url_prefix}  ')
@@ -142,9 +142,11 @@ def url2local(url):
         http://服务器域名/xxx ->  {static_prefix}/xxx
     """
     local_path = url.replace(
-        args.url_prefix + '/', "") #  http://服务器域名/xxx  ->  xxx
-    local_path = str(Path(path.RootPath.static_folder_dir_prefix).joinpath(local_path)) # xxx -> {static_prefix}/xxx
+        args.url_prefix + '/', "")  # http://服务器域名/xxx  ->  xxx
+    local_path = str(Path(path.RootPath.static_folder_dir_prefix).joinpath(
+        local_path))  # xxx -> {static_prefix}/xxx
     return local_path
+
 
 def glob_sort(paths, regex='(\d+)'):
     """
@@ -189,7 +191,10 @@ def imgs2pdf(sorted_paths: List[str], output_dir=None, file_name='temp') -> str:
         output_dir = os.path.dirname(sorted_paths[0])
     # img_file = "myImg.jpg"  # 图片路径
 
-    pdf_file_path = f'{output_dir}/{file_name}_{get_unique_str()}.pdf' if file_name == 'temp' else f'{output_dir}/{file_name}.pdf'
+    pdf_file_path = \
+        os.path.join(output_dir, f'{file_name}_{get_unique_str()}.pdf') \
+        if file_name == 'temp' \
+        else os.path.join(output_dir, f'{file_name}.pdf')
     # 创建一个PDF文件 并以二进制方式写入
     print(f'pdf_file_path: {pdf_file_path}')
     print(Path(pdf_file_path).exists())
