@@ -158,7 +158,6 @@ class OCR:
 # from threading import S
 # 现在考虑如何让一个线程并发两个线程, 幸好两
 # @RISK 每次导入都会执行一次
-print("可以吗")
 my_ocr = OCR()
 
 
@@ -886,9 +885,10 @@ class Video(DelAnd2Pickle):
         step = step or args.step
         self.speed_x = speed_x or args.speed_x
         if step == "fps":
-            self.step = int(self.fps * speed_x) # int是为了后续避免有些整除，或者range（step）或者处理后变小数之类的部分可能出现bug
+            # int是为了后续避免有些整除，或者range（step）或者处理后变小数之类的部分可能出现bug
+            self.step = int(self.fps * speed_x)
             if self.step == 0:
-                self.step = self.fps # @RISK 容错处理，其实抛出异常更合理
+                self.step = self.fps  # @RISK 容错处理，其实抛出异常更合理
         else:
             self.step = int(step * speed_x)
 
@@ -957,7 +957,8 @@ class Video(DelAnd2Pickle):
         # @MODIFY 修复self.section_nums为0作为被除数的bug
         self.gap = self.frame_counts // self.section_nums
         print(f'v: {self.name} 需要遍历的帧为： {self.process_frame_sum_counts}')
-        print(f'real step: {self.step}   |  video_fps: {self.fps}  | speed_x: {self.speed_x}')
+        print(
+            f'real step: {self.step}   |  video_fps: {self.fps}  | speed_x: {self.speed_x}')
         print(f'分区数量（线程数量）：{self.section_nums}')
         # @WAIT 帧id的取值是从0开始的吗, 是的话需要　self.frame_counts - 1
         self.sections = [
@@ -999,7 +1000,8 @@ class Video(DelAnd2Pickle):
 
         result = vo.VideoVO(
             id=self.id, kfs=kfs, img=None, name=self.name, local_path=self.local_path, chapter_id=self.chapter_id,
-            o_path=self.o_path, cw=self.courseware_url, url=self.url, output_dir=self.output_dir
+            o_path=self.o_path, cw=self.courseware_url, url=self.url, output_dir=self.output_dir,
+            step=self.step, speed_x=self.speed_x
         )
         return utils.json_dumps(result) if json_dumps else result
 
