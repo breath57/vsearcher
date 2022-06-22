@@ -841,7 +841,7 @@ class Video(DelAnd2Pickle):
     #         PaddleFrame().img_local_path
     th_min_box_height = ''
 
-    def __init__(self, video_path, output_dir, video_id, chapter_id, name=""):
+    def __init__(self, video_path, output_dir, video_id, chapter_id, step=None, speed_x=None, name=""):
         """
         ::name 如果没有传入, 默认视频的名称为name默认值
         output_dir 图片输出的根目录
@@ -883,10 +883,14 @@ class Video(DelAnd2Pickle):
         Video.th_min_box_height = args.update_th_min_box_height(self.height)
 
         # 初始化帧间隔
-        if args.step == "fps":
-            self.step = self.fps * args.speed_x
+        step = step or args.step
+        self.speed_x = speed_x or args.speed_x
+        if step == "fps":
+            self.step = int(self.fps * speed_x) # int是为了后续避免有些整除，或者range（step）或者处理后变小数之类的部分可能出现bug
+            if self.step == 0:
+                self.step = self.fps # @RISK 容错处理，其实抛出异常更合理
         else:
-            self.step = args.step * args.speed_x
+            self.step = int(step * speed_x)
 
         self.__init_section()  # 初始化 分区
         self.sections_kfs = [KeyFrames()
@@ -953,6 +957,7 @@ class Video(DelAnd2Pickle):
         # @MODIFY 修复self.section_nums为0作为被除数的bug
         self.gap = self.frame_counts // self.section_nums
         print(f'v: {self.name} 需要遍历的帧为： {self.process_frame_sum_counts}')
+        print(f'real step: {self.step}   |  video_fps: {self.fps}  | speed_x: {self.speed_x}')
         print(f'分区数量（线程数量）：{self.section_nums}')
         # @WAIT 帧id的取值是从0开始的吗, 是的话需要　self.frame_counts - 1
         self.sections = [
@@ -1530,7 +1535,9 @@ class Assember:
 
     @classmethod
     def executeCourse(cls,
-                      course_dir_path, output_dir=None, course_id="", course_name=""
+                      course_dir_path, output_dir=None,
+                      course_id="", course_name="",
+                      step=None, speed_x=None
                       ) -> Course:
         with utils.EvaluateTime(f'course[ {Path(course_dir_path).name} ]'):
             output_dir = output_dir or RootPath.output_courses_dir
@@ -1555,6 +1562,8 @@ class Assember:
                         output_dir=output_dir,
                         chapter_id=arg[0] + 1,
                         chapter_name=os.path.basename(arg[1]),
+                        step=step,
+                        speed_x=speed_x,
                         course_id=course_id), enumerate(chapter_dirs))  # arg: index, path
                 )
                 # chapters = [
@@ -1576,6 +1585,8 @@ class Assember:
             chapter_id="",
             chapter_name="",
             course_id="",
+            step=None,
+            speed_x=None
     ) -> Chapter:
         # 获取章节目录下的所有视频的路径
         # @RISK 视频类型的过滤器可能有隐藏的bug
@@ -1600,6 +1611,8 @@ class Assember:
                         output_dir=output_dir,
                         video_id=arg[0] + 1,
                         chapter_id=chapter_id,
+                        step=step,
+                        speed_x=speed_x
                     ), enumerate(video_paths))
                 )
                 return Chapter(
@@ -1612,6 +1625,8 @@ class Assember:
             output_dir=None,
             video_id="",
             chapter_id="",
+            step=None,
+            speed_x=None,
             name=""
     ) -> Video:
 
@@ -1632,6 +1647,8 @@ class Assember:
                 video_id=video_id,
                 chapter_id=chapter_id,
                 name=name,
+                step=step,
+                speed_x=speed_x
             )
             return v
 

@@ -41,7 +41,7 @@ class VSearcher:
         cls.config.args.url_prefix = domain_url
         cls.set_step(step, speed_x)
         cls.set_paddle_ocr_model_dir(ocr_model_dir)
-        cls.set_static_dir( static_folder )
+        cls.set_static_dir(static_folder)
         cls.set_output_dir(output_dir)
 
     # @classmethod
@@ -64,7 +64,7 @@ class VSearcher:
 
     @classmethod
     def set_output_dir(cls, relative_static_folder_path):
-        cls.config.RootPath.set_output_dir( relative_static_folder_path )
+        cls.config.RootPath.set_output_dir(relative_static_folder_path)
 
     @classmethod
     def set_static_dir(cls, relative_project_dir_path):
@@ -77,14 +77,16 @@ class VSearcher:
             url: http://localhost:5000/ff/ss/c.png
         """
         if relative_project_dir_path:
-            cls.config.RootPath.set_static_folder_dir( relative_project_dir_path )
+            cls.config.RootPath.set_static_folder_dir(
+                relative_project_dir_path)
 
     @classmethod
     def set_step(cls, step, speed_x):
+        """ 设置全局默认step """
         Assember.set_step(step=step, speed_x=speed_x)
 
     @classmethod
-    def executeVideo(cls, video_file_path, video_name=None) -> vo.VideoVO:
+    def executeVideo(cls, video_file_path, video_name=None, step=None, speed_x=None) -> vo.VideoVO:
         """ video_name: if None 则为 video_file_path 所示的名字 """
         if not Path(video_file_path).exists():
             print(f'路径: {video_file_path} 不存在!')
@@ -93,24 +95,26 @@ class VSearcher:
             print(f'传入的路径: {video_file_path} 不是视频')
             return None
         video = Assember.executeVideo(
-            video_path=video_file_path, name=video_name)
-        return vo.VideoVO.create( video=video )
+            video_path=video_file_path, name=video_name, step=step, speed_x=speed_x)
+        return vo.VideoVO.create(video=video)
 
     @classmethod
-    def executeChapter(cls, chapter_dir_path) -> vo.ChapterVO:
-        if not Path( chapter_dir_path ).exists():
-            print( f'路径: {chapter_dir_path} 不存在!' )
+    def executeChapter(cls, chapter_dir_path, step=None, speed_x=None) -> vo.ChapterVO:
+        if not Path(chapter_dir_path).exists():
+            print(f'路径: {chapter_dir_path} 不存在!')
             return None
-        chapter = Assember.executeChapter(chapter_dir_path=chapter_dir_path)
-        return vo.ChapterVO.create( chapter )
+        chapter = Assember.executeChapter(
+            chapter_dir_path=chapter_dir_path, step=step, speed_x=speed_x)
+        return vo.ChapterVO.create(chapter)
 
     @classmethod
-    def executeCourse(cls, course_dir_path) -> vo.CourseVO:
-        if not Path( course_dir_path ).exists():
-            print( f'路径: {course_dir_path} 不存在!' )
+    def executeCourse(cls, course_dir_path, step=None, speed_x=None) -> vo.CourseVO:
+        if not Path(course_dir_path).exists():
+            print(f'路径: {course_dir_path} 不存在!')
             return None
-        course = Assember.executeCourse(course_dir_path=course_dir_path)
-        return vo.CourseVO.create( course )
+        course = Assember.executeCourse(
+            course_dir_path=course_dir_path, step=step, speed_x=speed_x)
+        return vo.CourseVO.create(course)
 
     @classmethod
     def loadResource(cls, o_path):
@@ -118,11 +122,11 @@ class VSearcher:
             raise ValueError('o_path不存在')
         o = DelAnd2Pickle.loadPickle(o_path)
         if isinstance(o, Video):
-            return vo.VideoVO.create( o )
+            return vo.VideoVO.create(o)
         elif isinstance(o, Chapter):
-            return vo.ChapterVO.create( o )
+            return vo.ChapterVO.create(o)
         elif isinstance(o, Course):
-            return vo.CourseVO.create( o )
+            return vo.CourseVO.create(o)
 
     @classmethod
     def releaseResource(cls, o_path):
