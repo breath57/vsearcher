@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: vsearcher
-Version: 0.2.12
+Version: 0.2.13
 Summary: 支持视频内容检索和课件自动生成的库
 Home-page: https://gitee.com/breath57/vsearch/tree/0.2.6-pypi
 Author: breath
@@ -26,6 +26,7 @@ License-File: LICENSE
 1. 生成可序列化的信息: 包括帧的标题,文本内容,播放位置
 2. 框选搜索结果
 3. 多配置
+4. (新增)指定创建指定资源的资源文件夹
 
 支持的视频类型: 中文为主, 以PPT作为主体讲授的视频
 

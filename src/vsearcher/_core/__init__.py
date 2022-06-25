@@ -86,7 +86,7 @@ class VSearcher:
         Assember.set_step(step=step, speed_x=speed_x)
 
     @classmethod
-    def executeVideo(cls, video_file_path, video_name=None, step=None, speed_x=None) -> vo.VideoVO:
+    def executeVideo(cls, video_file_path, video_name=None, step=None, speed_x=None, output_dir=None) -> vo.VideoVO:
         """ video_name: if None 则为 video_file_path 所示的名字 """
         if not Path(video_file_path).exists():
             print(f'路径: {video_file_path} 不存在!')
@@ -95,8 +95,26 @@ class VSearcher:
             print(f'传入的路径: {video_file_path} 不是视频')
             return None
         video = Assember.executeVideo(
-            video_path=video_file_path, name=video_name, step=step, speed_x=speed_x)
+            video_path=video_file_path, name=video_name, step=step, speed_x=speed_x, output_dir=output_dir)
         return vo.VideoVO.create(video=video)
+
+    @classmethod
+    def createCourseDir(cls, course_name):
+        """ 
+        创建资源对应的目录, 并返回路径
+        type: course | chapter 
+        return: output_dir
+        """
+        return Assember.createPureDir(course_name=course_name)
+
+    @classmethod
+    def createChapterDir(cls, chapter_name, course_name):
+        """ 
+        创建资源对应的目录, 并返回路径
+        type: course | chapter 
+        return: output_dir
+        """
+        return Assember.createPureDir(chapter_name=chapter_name, course_name=course_name)
 
     @classmethod
     def executeChapter(cls, chapter_dir_path, step=None, speed_x=None) -> vo.ChapterVO:

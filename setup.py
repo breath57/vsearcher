@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="vsearcher",
-    version="0.2.12",
+    version="0.2.13",
     author="breath",
     author_email="1498408920@qq.com",
     maintainer="breath",

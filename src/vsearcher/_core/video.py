@@ -1,4 +1,4 @@
-from threading import Semaphore, Thread
+from threading import Semaphore
 import glob
 import os
 import pickle
@@ -883,6 +883,7 @@ class Video(DelAnd2Pickle):
 
         # 初始化帧间隔
         step = step or args.step
+        self.origin_step = step
         self.speed_x = speed_x or args.speed_x
         if step == "fps":
             # int是为了后续避免有些整除，或者range（step）或者处理后变小数之类的部分可能出现bug
@@ -958,7 +959,7 @@ class Video(DelAnd2Pickle):
         self.gap = self.frame_counts // self.section_nums
         print(f'v: {self.name} 需要遍历的帧为： {self.process_frame_sum_counts}')
         print(
-            f'real step: {self.step}   |  video_fps: {self.fps}  | speed_x: {self.speed_x}')
+            f'real step: {self.step}   |  video_fps: {self.fps}  | origin_step: {self.origin_step} | speed_x: {self.speed_x}')
         print(f'分区数量（线程数量）：{self.section_nums}')
         # @WAIT 帧id的取值是从0开始的吗, 是的话需要　self.frame_counts - 1
         self.sections = [
@@ -1534,6 +1535,22 @@ class Assember:
             if item.is_file() and filetype.is_video(str(item)):
                 return True
         return False
+
+    @classmethod
+    def createPureDir(cls,  course_name="",  chapter_name="") -> str:
+        """ 当course_name和chapter_name都有值, 代表创建 course_name下的chapter_name章节, 本质还是章节 """
+        dir_path = None
+        if not course_name:
+            dir_path = os.path.join(
+                RootPath.output_chapters_dir, chapter_name)
+        elif course_name:  # 创建课程
+            dir_path = os.path.join(
+                RootPath.output_courses_dir, course_name)
+        else:  # 创建课程下的某个章节
+            dir_path = os.path.join(
+                RootPath.output_courses_dir, course_name, chapter)
+        cls._setDir(dir_path)
+        return dir_path
 
     @classmethod
     def executeCourse(cls,
