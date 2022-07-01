@@ -37,7 +37,7 @@ class Performance:
     ocr_load = 1
 
     use_gpu = True  # 是否使用GPU
-    gpu_name = 'gpu:0'  # 指定gpu  @NOTE 至于多GPU, 该项目目前对GPU的要求内存要求不高, 对CPU内存要求高
+    gpu_name = 'gpu'  # 指定gpu  @NOTE 至于多GPU, 该项目目前对GPU的要求内存要求不高, 对CPU内存要求高
 
 
 # # 性能配置
@@ -79,7 +79,7 @@ url_prefix = "http://127.0.0.1:5000"  # 第三方访问图片路径的域名? �
 frame_name_gap = '-'  # name: 123-66, 其中, 123代表当前帧的帧编号, 66该帧内容帧的位置,即该画面开始的位置
 
 # paddleOCR args
-enable_mkldnn = True
+enable_mkldnn = True # CPU加速
 det_db_unclip_ratio = 2.2
 det_db_box_thresh = 0.5
 

@@ -25,18 +25,7 @@ from .._config import args
 from .._config import path
 from .._config.path import RootPath
 
-if args.Performance.use_gpu:
-    print('启用GPU............')
-    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-    # @RISK 判断设备是否存在 再设
-    if paddle.get_device() != 'cpu':
-        paddle.set_device(args.Performance.gpu_name)
-    print(f'cuda version: {paddle.get_cudnn_version()}')
-    print(f'current use device: {args.Performance.gpu_name}')
-else:
-    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-    paddle.set_device('cpu')
-    print(f'current use device: {paddle.get_device()} ')
+
 
 
 # paddle.set_device('gpu:0')
@@ -110,19 +99,31 @@ class ThreadManager:
 
 
 class OCR:
-    paddle_ocr_init_args = {
-        "det_model_dir": RootPath.det_model_dir,
-        "rec_model_dir": RootPath.rec_model_dir,
+    paddle_ocr_init_args = { # 所有用户相同的配置项
         "cpu_threads": args.Performance.cpu_threads,
         "enable_mkldnn": args.enable_mkldnn,
         "det_db_box_thresh": args.det_db_box_thresh,
         "det_db_unclip_ratio": args.det_db_unclip_ratio,
         "show_log": False,
-        "use_angle_cls": False
+        "use_angle_cls": False,
     }
     '''
         可以根据情况动态增加线程
     '''
+    @staticmethod
+    def init_device():
+        if args.Performance.use_gpu:
+            print('启用GPU............')
+            os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+            # @RISK 判断设备是否存在 再设
+            if paddle.get_device() != 'cpu':
+                paddle.set_device(args.Performance.gpu_name)
+            print(f'cuda version: {paddle.get_cudnn_version()}')
+            print(f'current use device: {paddle.get_device()}')
+        else:
+            os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+            paddle.set_device('cpu')
+            print(f'current use device: {paddle.get_device()} ')
 
     def __init__(self, ocr_num=args.Performance.ocr_num, ocr_load=args.Performance.ocr_load):
         '''
@@ -130,9 +131,13 @@ class OCR:
         ocr_load: 每个OCR对象, 同时处理的线程的最大数量
         '''
         print("OCR对象创建成功!")
+        self.init_device()
         self.ocr_num = ocr_num
         # self.ocrs = [PaddleOCR( **self.paddle_ocr_init_args )
         #              for i in range( ocr_num )]
+        self.paddle_ocr_init_args.update({'det_model_dir':  RootPath.det_model_dir})
+        self.paddle_ocr_init_args.update({'rec_model_dir':  RootPath.rec_model_dir})
+        print(self.paddle_ocr_init_args)
         self.ocrs = [PaddleOCR(**self.paddle_ocr_init_args)] * ocr_num
         self.locks = [Semaphore(ocr_load) for i in range(ocr_num)]
 
@@ -158,8 +163,18 @@ class OCR:
 # from threading import S
 # 现在考虑如何让一个线程并发两个线程, 幸好两
 # @RISK 每次导入都会执行一次
-my_ocr = OCR()
+my_ocr = None # @WAIT（可以优化，重构） 延迟调用，需要项目根目录正确加载后，指定的模型文件才能正确找到
+def set_ocr():
+    """ 重新创建，新参数的ocr """
+    global my_ocr
+    my_ocr = OCR()
 
+def get_ocr():
+    global my_ocr
+    if my_ocr is None:
+        set_ocr()
+    return my_ocr
+# my_ocr = OCR()
 
 # @WAIT 设计的不合理
 
@@ -299,7 +314,7 @@ class PaddleFrame:
     # def _name(self):
     #     return f'{self.video_id}  # {self.id}'
 
-    def __init__(self, id, frame, ms, img_outpath, video_id="", section_id=None, ocr=my_ocr):
+    def __init__(self, id, frame, ms, img_outpath, video_id="", section_id=None):
         """
         @WAIT 具体的id形式, 具体再确定
         params:
@@ -328,8 +343,8 @@ class PaddleFrame:
         @WAIT 返回的结果是否需要去除 停用词
         @PERFORMANCE 把np.array去除, 因为只有txts使用到np.array方法
         """
-
-        self.result = np.array(ocr.ocr_safe(img=frame, cls=False))  # 提取帧中的内容
+        my_ocr = get_ocr()
+        self.result = np.array(my_ocr.ocr_safe(img=frame, cls=False))  # 提取帧中的内容
         if len(self.result) == 0:  # 如果帧中没有内容
             self.has_txt = False
             self.boxes = np.array([])
@@ -849,6 +864,7 @@ class Video(DelAnd2Pickle):
         super().__init__(output_dir=output_dir, o_path_dir=output_dir)  # 初始化输出目录
         # if not video_path:
         #     raise FileExistsError('Please correct video path!')
+        # global my_ocr
         if not name:
             self.name = Path(output_dir).stem
         else:
@@ -1397,8 +1413,12 @@ class Video(DelAnd2Pickle):
                 # 增加一层, 框框数太多, 为代码也, 框框的高度大小, 代码也
                 self.__section_iter_func(
                     pf=PaddleFrame(
-                        frame_id, frame, frame_ms, self.output_dir, self.id, section_id=section_id,
-                        ocr=my_ocr
+                        id=frame_id, 
+                        frame=frame, 
+                        ms = frame_ms, 
+                        img_outpath = self.output_dir, 
+                        video_id = self.id, 
+                        section_id=section_id
                     ),
                     section_id=section_id
                 )
@@ -1525,6 +1545,11 @@ class Assember:
     COURSE = 'course'
     CHAPTER = 'chapter'
     VIDEO = 'video'
+
+    @staticmethod
+    def setOCR():
+        """ 重新创建，新参数的ocr """
+        set_ocr()
 
     @staticmethod
     def includeVideo(path_dir:  Path) -> bool:

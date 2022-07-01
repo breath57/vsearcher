@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="vsearcher",
-    version="0.2.13",
+    version="0.2.14",
     author="breath",
     author_email="1498408920@qq.com",
     maintainer="breath",
@@ -38,7 +38,7 @@ setuptools.setup(
         "paddleocr>=2.5",
         "pandas>=1.4.2",
         "Pillow>=9.1.1",
-        "setuptools>=62.3.1",
+        "setuptools>=58.3.1",
     ]
 
 )

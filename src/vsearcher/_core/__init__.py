@@ -28,21 +28,25 @@ class VSearcher:
         pass
 
     @classmethod
-    def init(cls, domain_url='http://localhost:5000', static_folder="static", output_dir="vs-output", step='fps', speed_x=1, ocr_model_dir=None):
+    def init(cls, domain_url,project_root_dir="", static_folder="static", output_dir="vs-output", step='fps', speed_x=1, ocr_model_dir=None):
         """
         domain_url: 外部访问静态资源时的URL前半部分
         step: 视频遍历的帧间隔, 越大速度越快
         speed_x: 对step进行整数倍的加速, 即 最终的step = step * speed_x
-        ocr_model_dir: 含有.pdmodel文件的目录相对路径, 默认为: ocrv2模型
+        ocr_model_dir: 含有.pdmodel文件的目录相对路径, 默认为: ocrv3模型
         static_folder: 可以外部url访问的静态文件夹的目录路径, 该路径是相对于项目的根路径
         output_dir: vsearch处理结果输出的保存的相对于static_folder的路径, 即: 实际的输出目录为: {static_folder}/{output_dir}
         """
-        # cls.set_name_(_name_)
+        # @RISK 以下初始化顺序最好不要有改动
+        cls.config.RootPath.set_project_dir(project_root_dir)
         cls.config.args.url_prefix = domain_url
         cls.set_step(step, speed_x)
         cls.set_paddle_ocr_model_dir(ocr_model_dir)
-        cls.set_static_dir(static_folder)
-        cls.set_output_dir(output_dir)
+        # 如下两方法顺序不可以变
+        cls.set_static_dir(static_folder) 
+        cls.set_output_dir(relative_static_folder_path= output_dir)
+        Assember.setOCR() # 创建OCR对象
+
 
     # @classmethod
     # def set_name_(cls, _name_):
