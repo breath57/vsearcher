@@ -38,8 +38,8 @@ def saveObject(out_path, o, name=''):
 def readObject(input_path, name):
     input_path = os.path.join(input_path, name) + '.pkl'
     if not os.path.exists(input_path):
-        print(f'path: {input_path} 不存在! ')
-        return None
+        raise RuntimeError(f'path: {input_path} 不存在! ')
+        # return None
     with open(input_path, 'rb') as file:
         return pickle.loads(file.read())
 
@@ -57,21 +57,18 @@ def readCourseObject(name):
 
 
 def cvimread(path):
-    """
-    读取路径包含中文的图片
-    """
+    """ (兼容)读取路径包含中文的图片"""
     return cv.imdecode(np.fromfile(path, dtype=np.uint8), -1)
 
 
 def cvimwrite(path, img):
-    """
-    保存路径包含中文的图片
-    """
+    """ (兼容)保存路径包含中文的图片 """
     # cv2.imencode(保存格式, 保存图片)[1].tofile(保存路径)
     cv.imencode(f'.{args.img_format}', img)[1].tofile(path)
 
 
 def __json_dumps_default_func(o):
+    """ 将{o}序列化 """
     tp = str(type(o))
     # print(f'current type: {tp}  type: {type(o)}   value: {o}  ')
     if tp.find('float') != -1:
@@ -85,7 +82,7 @@ def __json_dumps_default_func(o):
 
 def json_dumps(o) -> str:
     """
-    可以兼容: 含有numpy 还有 该项目中对象的 json序列化
+    可以兼容: 含有numpy数值对象, 或有__dict__方法的对象 的序列化
     """
     return json.dumps(o, default=__json_dumps_default_func)
 
@@ -97,9 +94,7 @@ def json_loads(json_str):
 
 
 def msToH_M_S_str(ms):
-    """
-
-    """
+    """ 将毫秒 格式化为 时:分:秒 """
     # print(f'ms: {ms}')
     s = ms//1000
     ss = str(int(s % 60))
@@ -118,16 +113,25 @@ def msToH_M_S_str(ms):
 
 
 def local2url(local_path):
+    """ 将本地路径转换为可通过http访问的URL路径
+
+    note!: 如果url_prefix 不符合 url链接前缀规则, 将不进行路径转换并返回None
+
+    转换过程：
+        static_folder_dir_prefix = a/b
+        a/b/c/d/xxx -> c/d/xxx
+        c/d/xxx ->  http://${args.url_prefix}/c/d/xxx
     """
-        http://127.0.0.1/xxx -> http://服务器域名/xxx
-    """
-    # source_path = local_path.replace(  # 作用： http://服务器域名/xxx  -> 得到内容 /xxx
+
+    #  source_path = local_path.replace(  # 作用： http://服务器域名/xxx  -> 得到内容 /xxx
     #     path.RootPath.static_folder_dir, '').replace( '\\', '/' )  # 获取路径 排除域名，域名不能进行编码否则容易出问题
+    if not args.url_prefix or not args.url_prefix.startswith('http'):
+        """ 如果url_prefix 不符合 url链接前缀规则, 将不进行路径转换并返回None """
+        return None
+
     local_path = str(Path(local_path))\
         .replace(path.RootPath.static_folder_dir_prefix, '')
 
-    # a/b/c /c
-    # a/b/c
     if local_path[0] in ['/', "\\"]:
         local_path = local_path[1:]
     url = f'{args.url_prefix}/{local_path}'.replace("\\", '/')
@@ -136,11 +140,16 @@ def local2url(local_path):
     #     f'project_root_dir: {path.RootPath.project_root_dir} img_url_prefix: {args.img_url_prefix}  ')
     return url  # @MODIFY 为了应对本地路径中含有空白字符和转义字符, 导致url路径不正确
 
-
 def url2local(url):
+    """ 将url路径转换为本地路径
+
+        note!: 如果不是url路径(包括None), 那么将不进行处理直接返回None
+        http://${domain_url}/${static_folder_dir_prefix}/xxx ->  local_path
     """
-        http://服务器域名/xxx ->  {static_prefix}/xxx
-    """
+    if not url or not url.startswith('http'):
+        # local_path = url
+        return None
+
     local_path = url.replace(
         args.url_prefix + '/', "")  # http://服务器域名/xxx  ->  xxx
     local_path = str(Path(path.RootPath.static_folder_dir_prefix).joinpath(
@@ -149,8 +158,8 @@ def url2local(url):
 
 
 def glob_sort(paths, regex='(\d+)'):
-    """
-    由于glob出来的路径, 是乱序的, 因此根据个人设定的文件名, 按照读取到的视频帧排序
+    """ 由于glob出来的路径, 是乱序的, 因此根据个人设定的文件名, 按照读取到的视频帧排序
+
     例如: '-6625%6600.png' => 6625    '-6625.png' => 6625  '6625.png' => 6625
     """
 
@@ -168,19 +177,22 @@ def glob_sort(paths, regex='(\d+)'):
 
 
 def get_unique_str() -> str:
-    """
-        含有时序信息的名唯一名称
-    """
+    """ 获取含有时序信息的名唯一字符串 """
     return f'{time.time()}'
 
 
 def imgs2pdf(sorted_paths: List[str], output_dir=None, file_name='temp') -> str:
-    """
-        @MODIFY img2pdf是一个库, 函数不能重名 所以改为 imgs2pdf
-        如果不传入输出目录, 则直接生成在图片的目录下, 并且返回pdf文件的本地路径
-        @Notice 如果文件已经存在则直接使用, 不会重新生成和覆盖, @RISK 新的视频和旧的视频重名了, @SOLUTION 所以可以考虑为每个视频生成md5(指纹), 就可以避免已经存在的文件, 重新加载
-        return:
-            if file_name = 'temp' then {name}_{get_unique_str()}.pdf
+    """ 将图片转换为pdf, 并返回pdf的本地路径
+
+    @Notice 如果不传入输出目录, 则直接生成在图片的目录下, 并且返回pdf文件的本地路径
+    @Notice 如果文件已经存在则直接使用, 不会重新生成和覆盖
+
+    return:
+        if file_name = 'temp' then {name}_{get_unique_str()}.pdf
+
+    @MODIFIED img2pdf是一个库, 函数不能重名 所以改为 imgs2pdf
+    @RISKED 新的视频和旧的视频重名了（通过重命名 | 覆盖 方式，已经解决）
+    @SOLUTION 所以可以考虑为每个视频生成md5(指纹), 就可以避免已经存在的文件, 重新加载
     """
     if not sorted_paths:
         return None
@@ -214,7 +226,7 @@ def calculate_runtime(func, *args, **kwargs):
     print(f'运行时间: {end_time - start_time}')
 
 
-def timeIntervalClear(del_path, search_clear_period_seconds=args.default_clear_period_seconds) -> Thread:
+def timeIntervalClear(del_path, search_clear_period_seconds=args.search_result_restore_time_seconds) -> Thread:
     """ 定时删除某个目录或者问价，构建一个删除队列 """
 
     def temp(del_path):
@@ -244,3 +256,4 @@ class EvaluateTime:
         print("==================== Evaluate Time =====================")
         print(f'{f"note: {self.note}" if self.note else ""} | spend time: {self.end_time - self.start_time}')
         print("========================================================")
+ 

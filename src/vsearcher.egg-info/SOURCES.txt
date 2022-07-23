@@ -12,7 +12,10 @@ src/vsearcher/_config/__init__.py
 src/vsearcher/_config/args.py
 src/vsearcher/_config/path.py
 src/vsearcher/_core/__init__.py
-src/vsearcher/_core/sim_v2.py
+src/vsearcher/_core/decorate.py
+src/vsearcher/_core/sim.py
+src/vsearcher/_core/type.py
 src/vsearcher/_core/utils.py
 src/vsearcher/_core/video.py
 src/vsearcher/_core/vo.py
+test/test.py

@@ -1,1 +1,1 @@
-from ._core import VSearcher
+from ._core import VSearcher, Config

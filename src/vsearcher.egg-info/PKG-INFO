@@ -1,12 +1,12 @@
 Metadata-Version: 2.1
 Name: vsearcher
-Version: 0.2.14
+Version: 0.2.16
 Summary: 支持视频内容检索和课件自动生成的库
-Home-page: https://gitee.com/breath57/vsearch/tree/0.2.6-pypi
+Home-page: https://gitee.com/breath57/vsearch/tree/0.2.16-pypi
 Author: breath
 Author-email: 1498408920@qq.com
 Maintainer: breath
-Keywords: video,search,courseware,ocr
+Keywords: video,search,video search,courseware,ocr
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
@@ -14,100 +14,56 @@ Requires-Python: >=3.9
 Description-Content-Type: text/markdown
 License-File: LICENSE
 
-## 介绍
-----
-
-### 主要功能:
-1. 视频内容搜索
-2. 课件生成
-
-
-### 其它能力:
-1. 生成可序列化的信息: 包括帧的标题,文本内容,播放位置
-2. 框选搜索结果
-3. 多配置
-
-### 更新
-1. 初始化可以指定项目路径, 方便不同路径下运行, 输出产生的路径不变
-
-支持的视频类型: 中文为主, 以PPT作为主体讲授的视频
-
-### 鲁棒性:
-* 动画切换
-* 内容递增
-* 中英文内容
-* 人像的讲解
-* 无重复
-
-### 快速使用:
-1. 安装
-
-> 步骤 1 安装Paddle框架
-选择CPU或GPU其一安装即可
-
-**cpu版:**
-```
-python3 -m pip install paddlepaddle==2.3.0 -i https://mirror.baidu.com/pypi/simple
-```
-**GPU版** (通常需要安装CUDA等显卡适配软件)
-
-不同环境的安装方式不同, [点击查看详情](https://www.paddlepaddle.org.cn/)
-
-> 步骤 2
-```
-pip install -i https://test.pypi.org/simple/ vsearcher=={version}
-```
-2. 使用案例
-```py
-from vsearcher import VSearcher
-
-def test():
-    VSearcher.init(static_folder="app/static", output_dir='vs-output') # 设置输出文件夹
-    video_path = "./test.mp4" # 视频文件路径：请填入真实的文件可访问视频路径
-    video = VSearcher.executeVideo(video_file_path=video_path) # 处理视频 生成 注释文件
-    courseware = video.cw # 获取生成的课件的路径
-    result = VSearcher.search(video, '关键字') # 视频检索
-    VSearcher.releaseByOutputDir(video.output_dir) # 清空处理期间产生的文件
-    print(f'courseware: {courseware}')
-    print(f'search_result: {dict(result)}')
-
-if __name__ == '__main__':
-    test()
-```
-
-3. 问题
-
-> 3.1 在linux环境下可能出现cv2相关的异常问题
-
-解决方案 1： 安装如下包
-```
-pip install opencv-contrib-python
-pip install opencv-python-headless
-pip install openpyxl
-```
-
-若执行方案1之后还有报错，则执行如下命令即可
-```
-pip uninstall opencv-contrib-python
-pip uninstall opencv-python-headless
-pip uninstall openpyxl
-
-pip install opencv-contrib-python
-pip install opencv-python-headless
-pip install openpyxl
-```
+<div style="display: flex; 
+    flex-direction: column; 
+    justify-content: center; 
+    align-items: center;">
+    <img style="width: 10em;" src="http://breath57.gitee.io/vs-docs/images/vs-logo.ico"/>
+</div>
+<h1 style="text-align: center;">VSearcher</h1>
+<p style="text-align: center;">国内为数不多的教学类视频内容检索Python库</p>
+<div style="display: flex;
+    flex-direction: row;
+    justify-content: center;
+}">
+<img style="margin: 0 .27em;
+    margin: .2em;" src='https://img.shields.io/badge/最新版本-v0.2.16-3963bc.svg'/>
+<img style="margin: 0 .27em;
+    margin: .2em;" src='https://img.shields.io/badge/build-passing-00d508.svg'/>
+<img style="margin: 0 .27em;
+    margin: .2em;" src='https://img.shields.io/badge/license-MIT-f0f900.svg'/>
+</div>
+<div style='display: flex;
+    flex-direction: row;
+    justify-content: center;
+}r'>
+    <img style="margin: 0 .27em;
+    margin: .2em;" src='https://img.shields.io/badge/python-v3.8+-7efaff.svg'/>
+    <img style="margin: 0 .27em;
+    margin: .2em;" src='https://img.shields.io/badge/setuptools-v59.8.0+-7ecaff.svg'/>
+    <img style="margin: 0 .27em;
+    margin: .2em;" src='https://img.shields.io/badge/pip-v21.3.1+-00d5a8.svg'/>
+    <img style="margin: 0 .27em;
+    margin: .2em;" src='https://img.shields.io/badge/opencv_python-v4.5.5-0fcff8.svg'/>
+</div>
 
 
-> 3.2 出现如下异常信息
-```
-_message.Message._CheckCalledFromGeneratedFile()
-TypeError: Descriptors cannot not be created directly.
-If this call came from a _pb2.py file, your generated code is out of date and must be regenerated with protoc >= 3.19.0.
-If you cannot immediately regenerate your protos, some other possible workarounds are:
- 1. Downgrade the protobuf package to 3.20.x or lower.
- 2. Set PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python (but this will use pure-Python parsing and will be much slower).
-```
-解决
-```
-pip3 install protobuf==3.20
-```
+<div style='display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;;margin: .5em 0  3em 0;'>
+    <a style="   
+    border-radius: 5px;
+    width: 8em;
+    font-size: 1.3em;
+    text-align: center;
+    line-height: 2em;
+    height:2em;
+    text-decoration-line: none;
+    background-color: #1387c1;
+    color: #fff;
+    margin: 0.2em 1em;
+    padding: 0 0.2em;
+    text-align: center;
+    " href="http://breath57.gitee.io/vs-docs/">查看官方文档</a>
+</div>

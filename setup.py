@@ -9,15 +9,15 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="vsearcher",
-    version="0.2.14",
+    version="0.2.16",
     author="breath",
     author_email="1498408920@qq.com",
     maintainer="breath",
     description="支持视频内容检索和课件自动生成的库",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://gitee.com/breath57/vsearch/tree/0.2.6-pypi",
-    keywords=["video", "search", "courseware", "ocr"],
+    url="https://gitee.com/breath57/vsearch/tree/0.2.16-pypi",
+    keywords=["video", "search","video search", "courseware", "ocr"],
     project_urls={
         # "Bug Tracker": "bug连接",
     },
@@ -36,9 +36,7 @@ setuptools.setup(
         "numpy>=1.22.4",
         "opencv_python>=4.5.5.64",
         "paddleocr>=2.5",
-        "pandas>=1.4.2",
         "Pillow>=9.1.1",
-        "setuptools>=58.3.1",
     ]
 
 )

@@ -3,4 +3,6 @@
 .python-version
 .idea/
 *.pytest_cache/
-
+static
+/test.mp4
+/test.py

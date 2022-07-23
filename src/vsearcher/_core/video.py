@@ -1,3 +1,9 @@
+# -*- encoding: utf-8 -*-
+'''
+@description: core module
+@author: breath57
+@email: breath57@163.com
+'''
 from threading import Semaphore
 import glob
 import os
@@ -20,12 +26,10 @@ from paddleocr import PaddleOCR, draw_ocr
 
 # import paddle
 from . import utils, vo
-from .sim_v2 import TextSimilarity
+from .sim import TextSimilarity
 from .._config import args
 from .._config import path
 from .._config.path import RootPath
-
-
 
 
 # paddle.set_device('gpu:0')
@@ -52,6 +56,7 @@ del self.cap self.result 将 paddleOCR置出 节约持久化
 
 
 class ThreadManager:
+    """ 多线程和多进程管理类，根据配置文件中的性能配置项，动态创建线程或进程池 """
 
     @staticmethod
     def getPoolsExecutor(max_workers=None, mode=None):
@@ -71,37 +76,12 @@ class ThreadManager:
             return futures.ProcessPoolExecutor(max_workers=max_workers)
         else:
             return futures.ThreadPoolExecutor(max_workers=1)
-        # return futures.ProcessPoolExecutor()
-
-# class CvCap:
-#     def __init__(self,video_path, ocr_num=args.Performance.ocr_num):
-#         '''
-#         ocr_num: 创建的OCR对象的个数
-#         ocr_load: 每个OCR对象, 同时处理的线程的最大数量
-#         '''
-#         print("CAP对象创建成功!")
-#         self.ocr_num = ocr_num
-#         # self.ocrs = [PaddleOCR( **self.paddle_ocr_init_args )
-#         #              for i in range( ocr_num )]
-#         cv.VideoCapture()
-#         self.caps = [cv.VideoCapture(video_path) for i in range( ocr_num)]
-#         self.locks = [Lock() for i in range(ocr_num)]
-
-#     def get_safe(self, **kwargs):
-#         i = random.randint(0, self.ocr_num - 1)
-#         self.locks[i].acquire()
-#         print('----------获取cap----')
-#         result = self.caps[i]
-
-#         print('----------结束OCR----')
-#         self.locks[i].release()
-#         return result
 
 
 class OCR:
-    paddle_ocr_init_args = { # 所有用户相同的配置项
+    paddle_ocr_init_args = {  # 所有用户相同的配置项
         "cpu_threads": args.Performance.cpu_threads,
-        "enable_mkldnn": args.enable_mkldnn,
+        "enable_mkldnn": args.Performance.enable_mkldnn,
         "det_db_box_thresh": args.det_db_box_thresh,
         "det_db_unclip_ratio": args.det_db_unclip_ratio,
         "show_log": False,
@@ -135,8 +115,10 @@ class OCR:
         self.ocr_num = ocr_num
         # self.ocrs = [PaddleOCR( **self.paddle_ocr_init_args )
         #              for i in range( ocr_num )]
-        self.paddle_ocr_init_args.update({'det_model_dir':  RootPath.det_model_dir})
-        self.paddle_ocr_init_args.update({'rec_model_dir':  RootPath.rec_model_dir})
+        self.paddle_ocr_init_args.update(
+            {'det_model_dir':  RootPath.det_model_dir})
+        self.paddle_ocr_init_args.update(
+            {'rec_model_dir':  RootPath.rec_model_dir})
         print(self.paddle_ocr_init_args)
         self.ocrs = [PaddleOCR(**self.paddle_ocr_init_args)] * ocr_num
         self.locks = [Semaphore(ocr_load) for i in range(ocr_num)]
@@ -163,11 +145,14 @@ class OCR:
 # from threading import S
 # 现在考虑如何让一个线程并发两个线程, 幸好两
 # @RISK 每次导入都会执行一次
-my_ocr = None # @WAIT（可以优化，重构） 延迟调用，需要项目根目录正确加载后，指定的模型文件才能正确找到
+my_ocr = None  # @WAIT（可以优化，重构） 延迟调用，需要项目根目录正确加载后，指定的模型文件才能正确找到
+
+
 def set_ocr():
     """ 重新创建，新参数的ocr """
     global my_ocr
     my_ocr = OCR()
+
 
 def get_ocr():
     global my_ocr
@@ -197,8 +182,10 @@ class Searcher:
             self.o = o_or_path
         # 图片的输出目录 定义
         timestamp = int(time.time())
-        self.output_dir = str(Path(path.RootPath.output_search_result_dir)
-                              .joinpath(str(timestamp)))
+        search_output_dir = Path(path.RootPath.output_search_result_dir)
+        if not search_output_dir.exists():
+            search_output_dir.mkdir()
+        self.output_dir = str(search_output_dir.joinpath(str(timestamp)))
         self.__setDir(self.output_dir)
 
     @staticmethod
@@ -213,7 +200,7 @@ class Searcher:
         # @WAIT 程名 + 章节名 + 视频名称 + key
         # print( '需要读取的图片路径' )
         # http://127.0.0.1:5000/static/vsearch-output/videos/pattern_pure_ppt/-0.png'
-        file_path = utils.url2local(pf.img)  # url路径转本地路径
+        file_path = pf.img_local_path  # url路径转本地路径
         frame = utils.cvimread(file_path)
         frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)  # 修正色域为Image读取正常
         frame = draw_ocr(frame, pf.boxes)  # 圈出搜索结果
@@ -268,10 +255,10 @@ class Searcher:
     #     # dosearch
     #     return o
 
-    def search(self, key, json_dumps=False):
-        # 定时删除搜索结果
+    def search(self, key, json_dumps=False, search_result_restore_time_seconds=None):
+        """ 对{key}进行搜索，并且定时删除搜索结果 """
         utils.timeIntervalClear(
-            self.output_dir, args.search_clear_period_seconds)
+            self.output_dir, search_result_restore_time_seconds or args.search_result_restore_time_seconds)
         return self.o.searchByKey(key=key, output_dir=self.output_dir, json_dumps=json_dumps)
 
 
@@ -344,7 +331,8 @@ class PaddleFrame:
         @PERFORMANCE 把np.array去除, 因为只有txts使用到np.array方法
         """
         my_ocr = get_ocr()
-        self.result = np.array(my_ocr.ocr_safe(img=frame, cls=False))  # 提取帧中的内容
+        self.result = np.array(my_ocr.ocr_safe(
+            img=frame, cls=False))  # 提取帧中的内容
         if len(self.result) == 0:  # 如果帧中没有内容
             self.has_txt = False
             self.boxes = np.array([])
@@ -568,12 +556,11 @@ class PaddleFrame:
         # cv.imdecode( np.fromfile(img_path, dtype=np.uint8 ), -1 )
         # 获取 root: vsearch-output  real: C/vsearch-output/
         # self.img_path = img_path
-        img_url = utils.local2url(img_path)
         # @modified 为了统一url路径, 而不是文件路径
         # @WAIT 将所有路径统一为 / 而不是window下的 \\
         # img_url = img_url.replace('\\', '/') # @MODIFY 修改为统一的
         # print( f"img_url: {img_url}" )
-        self.img = img_url
+        self.img = utils.local2url(img_path)
         self.img_local_path = img_path
         # @RISK 删除属性, 节约持久化需要的内存
 
@@ -795,8 +782,9 @@ class CWPathType(Enum):
 
 
 class DelAnd2Pickle:
+    """ 类似提供扩展的接口, 让集成的类支持对象的保存以及资源的删除 """
+    #  @WAIT 重新上传的, 重新刷新课件的功能, 其实就是重新生成某个视频 (已经通过【重命名】 | 【重置】 模式解决该问题)
 
-    # @WAIT 重新上传的, 重新刷新课件的功能, 其实就是重新生成某个视频
     def __init__(self, output_dir, o_path_dir=None):
         """
         output_dir: 资源存放的目录
@@ -806,59 +794,46 @@ class DelAnd2Pickle:
         self.o_path_dir = o_path_dir or output_dir
         self.o_path = None  # 调用toPickle方法, 将会赋值
 
-    """ 类似提供扩展的接口, 让集成的类支持对象的保存以及资源的删除 """
-
-    # TODO 继续
     def releaseResource(self):
         """ 释放所有输出的资源，包括： 视频文件｜视频课件 |文件夹｜ 视频pickle对象 | 图片"""
         if os.path.exists(self.output_dir):
             shutil.rmtree(self.output_dir, ignore_errors=True)
-        # video_path = self.local_path # 如果都在一个文件夹中, 就可以直接删除
-        # frame_img_dir = self.output_dir
-        # pickle_o_path = self  # 保存和读取的操作, 新增是否保存的属性, 显式调用
 
     def toPickle(self):
         """ 将当前的对象存储为pickle对象 """
-
+        # @TODO 转成vo再存储更好，全局统一输出和存储的对象
         self.o_path = utils.save_object_and_get_path(
             out_path=self.o_path_dir, o=self, name=self.name)
 
     @staticmethod
     def loadPickle(o_path: str):
+        """ 将保存的对象文件, 载入为python对象 """
         if not os.path.exists(o_path):
             print(f'path: {o_path} 不存在! ')
             return None
         with open(o_path, 'rb') as file:
             return pickle.loads(file.read())
 
-    def reload(self):
-        """ 根据新的参数, 重新对所有内容进行一次处理, 也就是更新 """
-        pass
+    # def reload(self):
+    #     """ @TODO 根据新的参数, 重新对所有内容进行一次处理, 也就是更新 """
+    #     pass
 
 
 class Video(DelAnd2Pickle):
     """
-    视频相关信息
-    功能:
-        1. 视频的总帧数
-        2. 视频的帧率
-        3. 根据帧号获取视频的播放时间, 单位: 毫秒
-        4. 将该视频 转换为 图片
-        5. 遍历功能, 设置一个插槽, 传入一个处理函数
-        @WAIT 加入将视频帧转pdf课件的功能
-        6.
+    视频处理类
+    主要功能:
+        1. 检索视频内容
+        2. 将课件帧生成为pdf课件
+    其它具体见函数
     """
-
-    # def saveToPDF(self):
-    #     paths =
-    #     for pf in self.sections_kfs[section_id].getList():
-    #         PaddleFrame().img_local_path
     th_min_box_height = ''
 
     def __init__(self, video_path, output_dir, video_id, chapter_id, step=None, speed_x=None, name=""):
         """
-        ::name 如果没有传入, 默认视频的名称为name默认值
-        output_dir 图片输出的根目录
+        args:
+            name 默认视频的名称为name默认值
+            output_dir 图片输出的根目录
         @WAIT 层级关系的设计后续还需要考虑
         """
         super().__init__(output_dir=output_dir, o_path_dir=output_dir)  # 初始化输出目录
@@ -873,9 +848,9 @@ class Video(DelAnd2Pickle):
         # self.output_dir = output_dir
         # self.kfs_out_put_dir = kfs_output_dir
 
-        # 复制视频
-        self.local_path = str(Path(output_dir).joinpath(
-            Path(video_path).name))  # 视频存放的目录
+        # 复制视频 并 修改名字为self.name
+        self.local_path = str(
+            Path(output_dir, f'{self.name}{Path(video_path).suffix}'))  # 视频存放的目录
 
         shutil.copy(video_path, self.local_path)  # 复制到目录下
         self.url = utils.local2url(self.local_path)  # 第三方访问url
@@ -895,7 +870,7 @@ class Video(DelAnd2Pickle):
         self.height = self.cap.get(cv.CAP_PROP_FRAME_HEIGHT)
         self.frame_counts = int(self.cap.get(cv.CAP_PROP_FRAME_COUNT))
 
-        Video.th_min_box_height = args.update_th_min_box_height(self.height)
+        Video.th_min_box_height = args.get_th_min_box_height(self.height)
 
         # 初始化帧间隔
         step = step or args.step
@@ -1000,25 +975,10 @@ class Video(DelAnd2Pickle):
         for pf in self.kfs:
             unit(pf, key)
 
-        # def unit(s_kfs: KeyFrames):
-        #     """
-        #         多线程 搜索 单元
-        #     """
-        #     search_kfs = []
-        #     for pf in s_kfs:
-        #         pfvo = pf.searchByKey( key )
-        #         if not pfvo.isEmpty():
-        #             search_kfs.append( pfvo )
-        #     return search_kfs
-        #
-        # results = self.__fastProcess( unit, self.sections_kfs )
-        # for result in results:
-        #     kfs += result
-
         result = vo.VideoVO(
             id=self.id, kfs=kfs, img=None, name=self.name, local_path=self.local_path, chapter_id=self.chapter_id,
             o_path=self.o_path, cw=self.courseware_url, url=self.url, output_dir=self.output_dir,
-            step=self.step, speed_x=self.speed_x
+            step=self.step, speed_x=self.speed_x, cw_local=self.courseware_path,
         )
         return utils.json_dumps(result) if json_dumps else result
 
@@ -1038,17 +998,8 @@ class Video(DelAnd2Pickle):
         # 因此 @WAIT 需要有一个判断地址是存在课件的方法
         return self.courseware_path if path_type is CWPathType.LOCAL else utils.local2url(self.courseware_path)
 
-    # def get_courseware_path(self, return_path_type: CWPathType = CWPathType.LOCAL):
-    #     return self.__generate_courseware( path_type=return_path_type )
-
-    # def getTimeMsByFrameID(self, frame_id):
-    #     帧编号 转换为 该视频播放位置的 毫秒数
-    #     @return millisecond
-    #     return frame_id / self.fps * 1000
     def __section_iter_func(self, pf: PaddleFrame, section_id):
-        """
-            对__run方法遍历的帧进行相关的处理, 判断是否需要加入关键帧集合
-        """
+        """ 对__run方法遍历的帧进行相关的处理, 判断{pf}是否需要加入关键帧集合，即{kfs} """
         print("------------------------------")
         # print(f"有效帧数: {self.processed_kfs_count}  当前帧: {pf.id}")
         print(
@@ -1057,17 +1008,16 @@ class Video(DelAnd2Pickle):
         old_pf = self.old_frames[section_id]
 
         def link_up(pf: PaddleFrame, old_pf: PaddleFrame = self.old_frames[section_id]):
-            """ 进行帧之间的衔接操作 """
+            """ 进行帧之间的衔接操作, 为了记录开始时间 """
             pf.start_id = old_pf.start_id
             pf.ms = old_pf.ms
 
         def set_old_frame(pf: PaddleFrame):
+            """ 将{pf}设置为old_frame"""
             self.old_frames[section_id] = pf
 
         def kfs_update(pf: PaddleFrame):
-            """
-                需要保证加入的帧为关键帧
-            """
+            """ 判断该帧是否需要加入，通过内容，清晰度等方面进行判断，并保证加入的帧为关键帧 """
             # def decision(pf: PaddleFrame, other_pf: PaddleFrame):
             #     d = [900, 990]
             #     np.abs( (d[0] - d[1]) / sum( d ) )
@@ -1123,33 +1073,7 @@ class Video(DelAnd2Pickle):
                 kfs_update(pf)
             set_old_frame(pf)
             return
-
-        # if cur_kfs.is_empty():
-        #     print( '=======================================' )
-        #     print( '=======================================' )
-        #     print( '=======================================' )
-        #     print( '=======================================' )
-
-        # def kfs_add(pf: PaddleFrame):
-        #     kfs = self.sections_kfs[section_id]
-        #     if not kfs.is_empty():
-        #         ret, sim = kfs.getTail().getSimScore(pf)
-        #         if sim > args.th_sim_score:
-        #             if ret == 1: # pf内容多
-        #                 kfs.updateTail(pf)
-        #             elif ret == 0:
-        #                 if pf.blur_score > kfs.getTail().blur_score:
-        #                     kfs.updateTail(pf)
-        #             else: # 内容减少, 丢掉就好了
-        #                 return
-        #         else:
-        #             kfs.add(pf)
-        #     else:
-        #         kfs.add(pf)
-        # @WAIT 具体的相似度算法可以参考策略模式, 将具体使用哪个相似度算法, 抽象成接口, 或者配置, 可以直接切换, 而不是这里写死
         ret_old, sim_score_old = pf.getSimScore(old_pf)
-        # ret_kfs_tail, sim_score_kfs_tail = pf.getSimScore(cur_kfs.getTail())
-        # sim_score = max(sim_score_old, sim_score_kfs_tail)
 
         if sim_score_old > args.th_sim_score:  # 前后帧相似 | 不进行帧的添加, 动画过渡
             # link_up( pf, old_pf )
@@ -1314,6 +1238,7 @@ class Video(DelAnd2Pickle):
             executor.map(lambda kfs: kfs.saveKfs(), self.sections_kfs)
 
     def __duplicateSectionKfs(self):
+        """ 多分区情况下， 区间边界帧去重 """
         # self.all_kfs = []
         deleted_pf = KeyFrames()
         # 在加一个关键帧区间的去重
@@ -1374,9 +1299,7 @@ class Video(DelAnd2Pickle):
         return sum([len(kfs) for kfs in self.sections_kfs])
 
     def __process_section(self, section: tuple, section_id: int, capReadLock: Lock):
-        """ 
-        功能： 处理一个section中的内容 | 区间去重
-         """
+        """  处理一个section中的内容 & 区间去重"""
         print(
             f"current section: {section}, section_id: {section_id}")
 
@@ -1395,7 +1318,7 @@ class Video(DelAnd2Pickle):
         # 开始正式的处理
         while True:
             current_pos = self.caps[section_id].get(cv.CAP_PROP_POS_FRAMES)
-            if current_pos > hight_pos - 1:  # 大于就置顶
+            if current_pos > hight_pos - 1:  # 大于结束
                 # self.caps[section_id].set( cv.CAP_PROP_POS_FRAMES, hight_pos )
                 # is_out_of_index = True
                 return
@@ -1413,11 +1336,11 @@ class Video(DelAnd2Pickle):
                 # 增加一层, 框框数太多, 为代码也, 框框的高度大小, 代码也
                 self.__section_iter_func(
                     pf=PaddleFrame(
-                        id=frame_id, 
-                        frame=frame, 
-                        ms = frame_ms, 
-                        img_outpath = self.output_dir, 
-                        video_id = self.id, 
+                        id=frame_id,
+                        frame=frame,
+                        ms=frame_ms,
+                        img_outpath=self.output_dir,
+                        video_id=self.id,
                         section_id=section_id
                     ),
                     section_id=section_id
@@ -1439,8 +1362,14 @@ class Video(DelAnd2Pickle):
 class Chapter(DelAnd2Pickle):
 
     def __init__(self, id: int, output_dir: str, name: str, course_id: int, videos: List[Video]) -> None:
-        """
-        output_dir: 章节输出根目录
+        """ 初始化方法
+
+        args:
+            id (int): 章节id
+            output_dir (str): 输出目录
+            name (str): 章节名称
+            course_id (int): 所属的课程id
+            videos (List[Video]): video实例对象列表
         """
         super().__init__(output_dir=output_dir)
         self.id = id
@@ -1473,22 +1402,11 @@ class Chapter(DelAnd2Pickle):
         ]
         需求:　需要有序的排序
         """
-        # videos = []
-
         with ThreadManager.getPoolsExecutor() as executor:
             args = (self.videos, [key] * len(self.videos))
             video_vos = list(executor.map(
                 lambda v, key: v.searchByKey(key, output_dir), *args))
-            # WAIT 去空集合, 其实也不一定有必要去, 去了之后目录结构没那么完整
             videos = [v for v in video_vos if not v.isEmpty()]
-            # for v in self.videos:
-            #     video_vo = v.searchByKey( key )
-            #     # if args.search_result_dict_mode:
-            #     #     if video_vo['kfs']:
-            #     #         videos.append( video_vo )
-            #     # else:
-            #     if not video_vo.isEmpty():
-            #         videos.append( video_vo )
             result = vo.ChapterVO(
                 id=self.id, videos=videos, name=self.name, course_id=self.course_id, o_path=self.o_path
             )
@@ -1519,20 +1437,11 @@ class Course(DelAnd2Pickle):
     def searchByKey(self, key, output_dir, json_dumps=False) -> vo.CourseVO:
         with ThreadManager.getPoolsExecutor() as executor:
             args = (self.chapters, [key] * len(self.chapters))
-            cos = list(executor.map(lambda chapter,
-                                    key: chapter.searchByKey(key, output_dir), *args))
-            cos = [c for c in cos if not c.isEmpty()]
-            # chapters = []
-            #
-            # for c in self.chapters:
-            #     chapter_vo = c.searchByKey( key )
-            #     # if args.search_result_dict_mode:
-            #     #     if chapter_vo['videos']:
-            #     #         chapters.append( chapter_vo )
-            #     # else:
-            #     if not chapter_vo.isEmpty():
-            #         chapters.append( chapter_vo )
-            result = vo.CourseVO(id=self.id, chapters=cos,
+            chapter_vos = list(executor.map(lambda chapter,
+                                            key: chapter.searchByKey(key, output_dir), *args))
+            chapter_vos = [
+                chapter_vo for chapter_vo in chapter_vos if not chapter_vo.isEmpty()]
+            result = vo.CourseVO(id=self.id, chapters=chapter_vos,
                                  name=self.name, output_dir=self.o_path)
             return utils.json_dumps(result) if json_dumps else result
 
@@ -1610,16 +1519,6 @@ class Assember:
                         speed_x=speed_x,
                         course_id=course_id), enumerate(chapter_dirs))  # arg: index, path
                 )
-                # chapters = [
-                #     Assember.executeChapter(
-                #         chapter_path=dir_path,
-                #         output_dir=output_dir,
-                #         chapter_id=i + 1,
-                #         chapter_name=os.path.basename( dir_path ),
-                #         course_id=course_id,
-                #     )
-                #     for i, dir_path in enumerate( chapter_dirs )
-                # ]
                 return Course(id=course_id, output_dir=output_dir, name=course_name, chapters=chapters)
 
     @staticmethod
@@ -1712,13 +1611,11 @@ class Assember:
 
     @classmethod
     def _setDir(cls, dir_path, duplicate_mode='rename'):
-        """
-        线程安全
-        作用: 设定存放处理结果的目录
-        如果目录不存在, 就创建目录; 存在就 清空目录下的文件 or 重命名
-        :param dir_path:
-        :duplicate_mode  'reset': 重置目录  'rename': 重新命名和创建
-        :return:
+        """ （线程安全）设定存放处理结果的目录; 如果目录不存在, 就创建目录; 存在就 清空目录下的文件 or 重命名
+
+        args:
+            dir_path: 目录路径
+            duplicate_mode:  'reset' -> 重置目录 | 'rename' -> 重新命名和创建
         """
         with cls.set_dir_lock:
             if not os.path.exists(dir_path):
