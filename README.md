@@ -2,7 +2,7 @@
     flex-direction: column; 
     justify-content: center; 
     align-items: center;">
-    <img style="width: 10em;" src="http://breath57.gitee.io/vs-docs/images/vs-logo.ico"/>
+    <img style="width: 10em;" src="http://breath57.github.io/vs-docs/images/vs-logo.ico"/>
 </div>
 <h1 style="text-align: center;">VSearcher</h1>
 <p style="text-align: center;">国内为数不多的教学类视频内容检索Python库</p>
@@ -49,5 +49,5 @@
     margin: 0.2em 1em;
     padding: 0 0.2em;
     text-align: center;
-    " href="http://breath57.gitee.io/vs-docs/">查看官方文档</a>
+    " href="http://breath57.github.io/vs-docs/">查看官方文档</a>
 </div>
